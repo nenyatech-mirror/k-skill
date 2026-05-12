@@ -58,7 +58,10 @@ def ensure_runtime() -> None:
                 return
             except (OSError, subprocess.CalledProcessError) as exc:
                 errors.append(f"{python}: {exc}")
-        raise RuntimeError("Unable to create flight-ticket-search venv with available Python interpreters: " + "; ".join(errors))
+        raise RuntimeError(
+            "Unable to create flight-ticket-search venv with available Python interpreters: "
+            + "; ".join(errors)
+        )
 
     def venv_has_fast_flights() -> bool:
         if not py.exists():
