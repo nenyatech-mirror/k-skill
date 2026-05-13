@@ -196,6 +196,33 @@ curl -fsS --get 'https://k-skill-proxy.nomadamas.org/v1/mfds/food-safety/search'
   --data-urlencode 'limit=5'
 ```
 
+KOSIS 통계 조회 endpoint (`KOSIS_API_KEY` 필요, caller `apiKey`는 무시하고 서버 쪽 키를 주입):
+
+```bash
+curl -fsS --get 'https://k-skill-proxy.nomadamas.org/v1/kosis/search' \
+  --data-urlencode 'q=1인 가구' \
+  --data-urlencode 'limit=3'
+
+curl -fsS --get 'https://k-skill-proxy.nomadamas.org/v1/kosis/meta' \
+  --data-urlencode 'tableId=DT_1JC1501' \
+  --data-urlencode 'metaType=ITM'
+
+curl -fsS --get 'https://k-skill-proxy.nomadamas.org/v1/kosis/data' \
+  --data-urlencode 'tableId=DT_1JC1501' \
+  --data-urlencode 'prdSe=Y' \
+  --data-urlencode 'start=2020' \
+  --data-urlencode 'end=2023' \
+  --data-urlencode 'objL1=ALL'
+```
+
+Kakao Local geocoding endpoint (`KAKAO_REST_API_KEY` 필요, caller `apiKey`는 무시하고 서버 쪽 키를 주입):
+
+```bash
+curl -fsS --get 'https://k-skill-proxy.nomadamas.org/v1/kakao-local/geocode' \
+  --data-urlencode 'q=서울역' \
+  --data-urlencode 'limit=1'
+```
+
 
 
 도서관 정보나루 도서 검색 endpoint (`DATA4LIBRARY_AUTH_KEY` 필요):
