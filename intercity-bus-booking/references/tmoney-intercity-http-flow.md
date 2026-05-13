@@ -104,6 +104,8 @@ Observed success markers:
 sats_Pcpy_Id
 ```
 
+Re-verified on 2026-05-13 with 동서울 -> 속초, 2026-05-20, 06:05 금강고속 우등, seat 1. `readPcpySats.do` returned `카드정보 입력` and `sats_Pcpy_Id=SP...`. Posting the resulting cancel/back fields with `pcpyCanc=C` to `/otck/readSatsFee.do` returned to the seat-selection page and subsequent timetable lookup still showed 24/28 seats.
+
 ### Cancellation / Back Flow
 
 A POST back to `/otck/readSatsFee.do` with `pcpyCanc=C` and the hold fields returned to seat selection and appeared to release the temporary hold in testing.
@@ -120,4 +122,5 @@ A POST back to `/otck/readSatsFee.do` with `pcpyCanc=C` and the hold fields retu
 - CAPTCHA was not observed in the tested flow.
 - A generic `errorCont` response usually means the posted form contract is incomplete, not necessarily that the route is unavailable; first verify `bef_Aft_Dvs` and `req_Rec_Num`.
 - Payment/card-info submission is separate and should not be automated without explicit confirmation.
+- The live card-information page did not expose an exact countdown/expiry text in probes. Treat temporary holds as short-lived: hand off immediately, and post the cancel/back fields for abandoned holds.
 - Terminal codes are Tmoney-specific and must not be mixed with KOBUS codes.

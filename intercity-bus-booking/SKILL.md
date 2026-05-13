@@ -128,7 +128,25 @@ python3 intercity-bus-booking/scripts/intercity_bus_search.py \
   --date 20260520
 ```
 
-The helper starts a cookie-backed session, posts the browser-required timetable fields, parses `readSasFeeInf(...)`, and prints JSON with departure time, company, class, fares, and remaining/total seats. It intentionally does not create temporary holds or submit payment data.
+The helper starts a cookie-backed session, posts the browser-required timetable fields, parses `readSasFeeInf(...)`, and prints JSON with departure time, company, class, fares, and remaining/total seats. By default it is read-only. With `--hold-seat <seatNo>` or `--hold-first-seat`, it enters `readSatsFee.do`, posts `readPcpySats.do`, and saves the official Tmoney card-information HTML page plus cancel/back fields. It still never submits card data or final payment.
+
+### Temporary Hold Helper
+
+To create a temporary hold and save the official card-information page:
+
+```bash
+python3 intercity-bus-booking/scripts/intercity_bus_search.py \
+  --depart-code 0511601 \
+  --arrive-code 2482701 \
+  --depart-name 동서울 \
+  --arrive-name 속초 \
+  --date 20260520 \
+  --select-index 1 \
+  --hold-first-seat \
+  --output-dir /tmp/tmoney-hold
+```
+
+Success requires `hold.success=true`, a `sats_Pcpy_Id`, and the saved page containing `카드정보 입력`. The saved cancel fields can be posted back to `/otck/readSatsFee.do` with `pcpyCanc=C` to abandon the hold. Live probes did not expose an exact countdown on the card-information page; treat the hold as short-lived and have the user complete payment immediately.
 
 ## Checkout-Entry Link Helper
 

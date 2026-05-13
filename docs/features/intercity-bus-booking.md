@@ -41,7 +41,23 @@ python3 intercity-bus-booking/scripts/intercity_bus_search.py \
   --date 20260520
 ```
 
-이 helper는 쿠키 세션을 시작하고 공식 배차 조회 POST를 수행한 뒤 출발시각, 운수사, 등급, 요금, 잔여/총 좌석을 JSON으로 출력한다. 임시 좌석 선점이나 결제 단계는 수행하지 않는다.
+이 helper는 쿠키 세션을 시작하고 공식 배차 조회 POST를 수행한 뒤 출발시각, 운수사, 등급, 요금, 잔여/총 좌석을 JSON으로 출력한다. 기본은 read-only이며, `--hold-seat` 또는 `--hold-first-seat`를 주면 좌석/요금 단계에 진입해 `readPcpySats.do`로 임시 좌석 선점을 만들고 공식 카드정보 입력 HTML과 cancel/back 필드를 저장한다. 결제 정보 입력·제출은 수행하지 않는다.
+
+### 임시 선점 예시
+
+```bash
+python3 intercity-bus-booking/scripts/intercity_bus_search.py \
+  --depart-code 0511601 \
+  --arrive-code 2482701 \
+  --depart-name 동서울 \
+  --arrive-name 속초 \
+  --date 20260520 \
+  --select-index 1 \
+  --hold-first-seat \
+  --output-dir /tmp/tmoney-hold
+```
+
+성공 조건은 JSON의 `hold.success=true`, `hold.hold_id` 존재, 저장된 HTML에 `카드정보 입력` 표시가 있는 것이다. 라이브 응답 페이지에는 정확한 만료 카운트다운 문구가 노출되지 않았으므로, 선점 후 결제는 즉시 진행하게 안내하고 방치된 선점은 저장된 cancel/back 필드로 해제한다.
 
 ## 주의할 점
 
