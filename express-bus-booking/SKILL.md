@@ -131,6 +131,22 @@ POST /mrs/cancPcpy.ajax
 
 Use the same relevant form fields plus the returned `pcpyNoAll` and `satsNoAll`. A successful response returns `MSG_CD=S0000`.
 
+## Helper Script
+
+Use the bundled helper for KOBUS lookup and optional temporary holds:
+
+```bash
+python3 express-bus-booking/scripts/kobus_express_booking.py \
+  --depart-code 021 \
+  --arrive-code 500 \
+  --date 20260520 \
+  --select-index 1 \
+  --hold-first-seat \
+  --output-dir /tmp/kobus-hold
+```
+
+For Seoul to Gwangju, the verified KOBUS route is `센트럴시티(서울)` code `021` to `광주(유·스퀘어)` code `500`. A successful hold returns `MSG_CD=S0000`, `pcpyNoAll`, `satsNoAll`, fare amounts, and saves a local auto-submit helper for the official KOBUS payment-information page. Final card entry and payment remain manual. Cancel abandoned holds with `/mrs/cancPcpy.ajax` using the saved cancel fields.
+
 ## Checkout-Entry Link Helper
 
 A plain official checkout URL is not enough because KOBUS expects a POST body containing the selected schedule, seat, fare, and hold identifiers. The practical user-facing pattern is:

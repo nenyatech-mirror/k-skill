@@ -133,6 +133,8 @@ Observed success marker:
 MSG_CD=S0000
 ```
 
+2026-05-13 서울→광주 re-verification: `센트럴시티(서울)(021) -> 광주(유·스퀘어)(500)`, 2026-05-20 00:45 중앙고속 심야우등, seat 1. `/mrs/setPcpy.ajax` returned `MSG_CD=S0000`, `pcpyNoAll`, `satsNoAll=01`, `TISSU_AMT=36900`; `/mrs/stplcfmpym.do?keep=/mrs/pay` rendered the official payment-information page; `/mrs/cancPcpy.ajax` returned `MSG_CD=S0000`.
+
 ### Checkout Entry
 
 ```text
