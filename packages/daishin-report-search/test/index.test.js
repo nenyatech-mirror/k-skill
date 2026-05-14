@@ -9,6 +9,7 @@ const {
   parseTimestamp,
   parseTreePaths
 } = require("../src/index")
+const { parseArgs } = require("../src/cli")
 
 const TREE_URL = "https://api.github.com/repos/jay-jo-0/github_pages_repo/git/trees/main?recursive=1"
 
@@ -31,6 +32,14 @@ function textResponse(value, ok = true) {
     headers: { get: () => "text/html; charset=utf-8" },
     text: async () => value
   }
+}
+
+function timestampPath(prefix, index) {
+  const day = String((index % 28) + 1).padStart(2, "0")
+  const hour = String(Math.floor(index / 28) % 24).padStart(2, "0")
+  const minute = String(Math.floor(index / (28 * 24)) % 60).padStart(2, "0")
+  const second = String(index % 60).padStart(2, "0")
+  return `${prefix}${day}${hour}${minute}${second}.html`
 }
 
 test("parseTimestamp parses timestamp filenames into ISO-like metadata", () => {
@@ -134,6 +143,61 @@ test("listReports can query detail text beyond the first page until it finds mat
 
   assert.deepEqual(result.items.map((item) => item.id), ["20260511082352"])
   assert.equal(result.query, "삼성전자")
+})
+
+test("listReports clamps non-finite and huge numeric options before inspecting reports", async () => {
+  const detailCalls = []
+  const tree = Array.from({ length: 600 }, (_, index) => ({ path: timestampPath("202605", index), type: "blob" }))
+  const fetcher = async (url) => {
+    if (url === TREE_URL) return jsonResponse({ tree })
+    detailCalls.push(url)
+    return textResponse("<h1>시장 요약</h1><p>일반 내용</p>")
+  }
+
+  const result = await listReports({ query: "없는검색어", limit: Infinity, maxInspect: 1e9, fetcher })
+
+  assert.equal(result.count, 0)
+  assert.equal(detailCalls.length, 500)
+  assert.equal(result.source.inspectedReports, 500)
+  assert.match(result.warnings.at(-1), /inspection budget exhausted after 500 of 600 report pages/)
+
+  const hugeLimitResult = await listReports({ limit: 1e9, fetcher })
+  assert.equal(hugeLimitResult.items.length, 50)
+})
+
+test("listReports falls back to defaults for invalid, zero, and negative numeric options", async () => {
+  const detailCalls = []
+  const tree = Array.from({ length: 60 }, (_, index) => ({ path: timestampPath("202604", index), type: "blob" }))
+  const fetcher = async (url) => {
+    if (url === TREE_URL) return jsonResponse({ tree })
+    detailCalls.push(url)
+    return textResponse("<h1>시장 요약</h1><p>일반 내용</p>")
+  }
+
+  const result = await listReports({ query: "없는검색어", limit: Number.NaN, maxInspect: -25, fetcher })
+
+  assert.equal(result.count, 0)
+  assert.equal(detailCalls.length, 50)
+  assert.equal(result.source.inspectedReports, 50)
+
+  const zeroLimit = await listReports({ limit: 0, maxInspect: 0, fetcher })
+  assert.equal(zeroLimit.items.length, 10)
+})
+
+test("parseArgs preserves numeric option text for library validation", () => {
+  assert.deepEqual(parseArgs(["--limit", "Infinity", "--max-inspect", "1e9"]), {
+    limit: "Infinity",
+    maxInspect: "1e9"
+  })
+})
+
+test("parseReportHtml preserves malformed numeric entities instead of throwing", () => {
+  const parsed = parseReportHtml("<h1>&#999999999999; &#x110000; &#65; &#x41;</h1><p>본문</p>")
+
+  assert.match(parsed.title, /&#999999999999;/)
+  assert.match(parsed.title, /&#x110000;/)
+  assert.match(parsed.title, /A A/)
+  assert.match(parsed.text, /본문/)
 })
 
 test("fetchReport returns detail plus optional explanation page", async () => {

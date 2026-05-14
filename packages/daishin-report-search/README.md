@@ -25,3 +25,10 @@ daishin-report-search --id 20260511082352 --include-explain
 - Browser detail: `https://jay-jo-0.github.io/github_pages_repo/<path>`
 
 No API key or proxy is required.
+
+## Boundaries
+
+- `limit` is normalized to a positive integer with a maximum of 50 results.
+- `maxInspect` is normalized to a positive integer with a maximum of 500 latest pages to avoid excessive raw GitHub fetches.
+- Invalid, zero, negative, or non-finite numeric options fall back to documented defaults.
+- The mirror can contain timestamped pages from sources other than Daishin Securities; inspect the returned title/headings/page URL before treating a result as Daishin-authored.

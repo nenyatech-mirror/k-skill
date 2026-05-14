@@ -14,8 +14,8 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === "--query" || arg === "-q") options.query = argv[++i] || ""
-    else if (arg === "--limit") options.limit = Number(argv[++i])
-    else if (arg === "--max-inspect") options.maxInspect = Number(argv[++i])
+    else if (arg === "--limit") options.limit = argv[++i]
+    else if (arg === "--max-inspect") options.maxInspect = argv[++i]
     else if (arg === "--id") options.id = argv[++i]
     else if (arg === "--include-explain") options.includeExplain = true
     else if (arg === "--include-html") options.includeHtml = true

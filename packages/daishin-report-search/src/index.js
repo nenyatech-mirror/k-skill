@@ -7,6 +7,10 @@ const RAW_BASE_URL = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANC
 const API_BASE_URL = `https://api.github.com/repos/${API_OWNER}/${REPO}`
 const TREE_URL = `${API_BASE_URL}/git/trees/${BRANCH}?recursive=1`
 const REPORT_PATH_PATTERN = /^(\d{14})(?:_explain)?\.html$/
+const DEFAULT_LIMIT = 10
+const MAX_LIMIT = 50
+const DEFAULT_MAX_INSPECT = 50
+const MAX_INSPECT = 500
 
 async function listReports(options = {}) {
   const {
@@ -19,9 +23,11 @@ async function listReports(options = {}) {
 
   if (!fetcher) throw new Error("fetch is required")
 
-  const normalizedLimit = Math.max(1, Number(limit) || 10)
+  const normalizedLimit = parsePositiveInteger(limit, DEFAULT_LIMIT, MAX_LIMIT)
   const normalizedQuery = String(query || "").trim()
-  const inspectBudget = Math.max(normalizedLimit, Number(maxInspect) || Math.max(50, normalizedLimit * 5))
+  const defaultInspectBudget = Math.max(DEFAULT_MAX_INSPECT, normalizedLimit * 5)
+  const normalizedMaxInspect = parsePositiveInteger(maxInspect, defaultInspectBudget, MAX_INSPECT)
+  const inspectBudget = Math.max(normalizedLimit, normalizedMaxInspect)
   const warnings = []
 
   const tree = await fetchJson(fetcher, TREE_URL)
@@ -280,6 +286,14 @@ function normalizeText(value) {
   return String(value || "").replace(/\s+/g, " ").trim()
 }
 
+function parsePositiveInteger(value, defaultValue, maxValue) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return defaultValue
+  const integer = Math.floor(parsed)
+  if (integer <= 0) return defaultValue
+  return Math.min(integer, maxValue)
+}
+
 function decodeEntities(value) {
   const named = {
     amp: "&",
@@ -290,9 +304,14 @@ function decodeEntities(value) {
     nbsp: " "
   }
   return String(value || "")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (entity, code) => decodeCodePoint(Number(code), entity))
+    .replace(/&#x([0-9a-f]+);/gi, (entity, code) => decodeCodePoint(Number.parseInt(code, 16), entity))
     .replace(/&([a-z]+);/gi, (_, name) => named[name.toLowerCase()] || `&${name};`)
+}
+
+function decodeCodePoint(codePoint, originalEntity) {
+  if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return originalEntity
+  return String.fromCodePoint(codePoint)
 }
 
 function encodeReportPath(path) {
