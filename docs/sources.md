@@ -113,6 +113,8 @@
 - 다이소몰 매장 픽업 재고: https://www.daisomall.co.kr/api/pd/pdh/selStrPkupStck (2026-05-05 기준 Unauthorized 차단 가능)
 - 다이소몰 매장 픽업 가능 매장 목록: https://www.daisomall.co.kr/api/ms/msg/selPkupStr (특정 상품의 픽업 가능 매장 리스트, 매장 수량은 미제공)
 - 다이소몰 온라인 재고: https://www.daisomall.co.kr/api/pdo/selOnlStck
+- 강남언니 공개 검색: https://www.gangnamunni.com/search?q=<keyword>
+- 강남언니 공개 병원 페이지: https://www.gangnamunni.com/hospitals/<id>
 - 마켓컬리 검색 API(v4): https://api.kurly.com/search/v4/sites/market/normal-search
 - 마켓컬리 검색 개수 API(v3): https://api.kurly.com/search/v3/sites/market/normal-search/count
 - 마켓컬리 상품 상세 페이지 예시: https://www.kurly.com/goods/5063110
@@ -130,6 +132,13 @@
 - coupang_partners hosted fallback PR (merged): https://github.com/retention-corp/coupang_partners/pull/1
 - bunjang-cli package: https://www.npmjs.com/package/bunjang-cli
 - bunjang-cli repo: https://github.com/pinion05/bunjangcli
+- 당근 메인: https://www.daangn.com/
+- 당근 지역 검색 API: https://www.daangn.com/kr/api/v1/regions/keyword?keyword=<지역명>
+- 당근 중고거래 검색 Remix data route: https://www.daangn.com/kr/buy-sell/all/?_data=routes/kr.buy-sell._index
+- 당근부동산 검색 Remix data route: https://www.daangn.com/kr/realty/?_data=routes/kr.realty._index
+- 당근알바 검색 Remix data route: https://www.daangn.com/kr/jobs/?_data=routes/kr.jobs._index
+- 당근중고차 검색 Remix data route: https://www.daangn.com/kr/cars/?_data=routes/kr.cars._index
+- 당근부동산 상세 페이지: https://realty.daangn.com/articles/<id>
 - 블루리본 메인: https://www.bluer.co.kr/
 - 블루리본 지역 검색: https://www.bluer.co.kr/search/zone
 - 블루리본 주변 맛집 JSON: https://www.bluer.co.kr/restaurants/map
@@ -151,6 +160,7 @@
 - 공중화장실정보 전국 CSV: https://file.localdata.go.kr/file/download/public_restroom_info/info
 - 공중화장실정보 지역별 CSV: https://file.localdata.go.kr/file/download/public_restroom_info/info?orgCode=<시도코드>
 - 서울특별시 지하철 실시간 도착정보: https://www.data.go.kr/data/15058052/openapi.do
+- 서울 실시간 도시데이터(`citydata_ppltn`): https://data.seoul.go.kr/dataList/OA-21778/A/1/datasetView.do
 - 경찰청 LOST112 습득물 목록: https://www.lost112.go.kr/find/findList.do
 - 서울교통공사 유실물센터: https://www.seoulmetro.co.kr/kr/page.do?menuIdx=541
 - GeekNews public RSS/Atom feed: https://feeds.feedburner.com/geeknews-feed

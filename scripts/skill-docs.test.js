@@ -186,6 +186,40 @@ test("README links to the contribution guide", () => {
   assert.match(readme, /\[기여 가이드\]\(CONTRIBUTING\.md\)/);
 });
 
+
+test("repository docs advertise Daangn read-only search skills", () => {
+  const readme = read("README.md");
+  const sources = read(path.join("docs", "sources.md"));
+  const skills = [
+    ["daangn-used-goods-search", "당근 중고거래 검색"],
+    ["daangn-realty-search", "당근부동산 검색"],
+    ["daangn-jobs-search", "당근알바 검색"],
+    ["daangn-cars-search", "당근중고차 검색"],
+  ];
+
+  assert.match(sources, /www\.daangn\.com\/kr\/api\/v1\/regions\/keyword/);
+  assert.match(sources, /realty\.daangn\.com\/articles/);
+
+  for (const [skillName, label] of skills) {
+    const skill = read(path.join(skillName, "SKILL.md"));
+    const featureDocPath = path.join(repoRoot, "docs", "features", `${skillName}.md`);
+    const featureDoc = read(path.join("docs", "features", `${skillName}.md`));
+
+    assert.ok(fs.existsSync(featureDocPath), `expected docs/features/${skillName}.md to exist`);
+    assert.ok(
+      readme.includes(`| ${label} | \`${skillName}\``),
+      `README should advertise ${skillName}`,
+    );
+    assert.ok(
+      readme.includes(`](docs/features/${skillName}.md)`),
+      `README should link docs/features/${skillName}.md`,
+    );
+    assert.match(skill, /kr\/api\/v1\/regions\/keyword/);
+    assert.match(featureDoc, /kr\/api\/v1\/regions\/keyword/);
+    assert.match(featureDoc, /(로그인|채팅|구매|문의|지원).*자동화/);
+  }
+});
+
 test("hwp skill documents kordoc-based parsing and supported operations", () => {
   const skillPath = path.join(repoRoot, "hwp", "SKILL.md");
 
@@ -1039,6 +1073,23 @@ test("daiso-product-search docs record the shipped feature and official sources"
   assert.match(sources, /https:\/\/www\.daisomall\.co\.kr\/api\/ms\/msg\/selStr/);
   assert.match(sources, /https:\/\/www\.daisomall\.co\.kr\/ssn\/search\/SearchGoods/);
   assert.match(sources, /https:\/\/www\.daisomall\.co\.kr\/api\/pd\/pdh\/selStrPkupStck/);
+});
+
+test("repository docs advertise the gangnamunni-clinic-search skill across install surfaces", () => {
+  const readme = read("README.md");
+  const install = read(path.join("docs", "install.md"));
+  const sources = read(path.join("docs", "sources.md"));
+  const featureDocPath = path.join(repoRoot, "docs", "features", "gangnamunni-clinic-search.md");
+  const skillPath = path.join(repoRoot, "gangnamunni-clinic-search", "SKILL.md");
+
+  assert.ok(fs.existsSync(featureDocPath), "expected docs/features/gangnamunni-clinic-search.md to exist");
+  assert.ok(fs.existsSync(skillPath), "expected gangnamunni-clinic-search/SKILL.md to exist");
+  assert.match(readme, /\| 강남언니 병원 조회 \| `gangnamunni-clinic-search` \|/);
+  assert.match(readme, /\[강남언니 병원 조회 가이드\]\(docs\/features\/gangnamunni-clinic-search\.md\)/);
+  assert.match(install, /--skill gangnamunni-clinic-search/);
+  assert.match(install, /npm install -g .*gangnamunni-clinic-search/);
+  assert.match(sources, /강남언니 공개 검색: https:\/\/www\.gangnamunni\.com\/search\?q=<keyword>/);
+  assert.match(sources, /강남언니 공개 병원 페이지: https:\/\/www\.gangnamunni\.com\/hospitals\/<id>/);
 });
 
 test("repository docs advertise the market-kurly-search skill across the documented surfaces", () => {
