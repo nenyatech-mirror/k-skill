@@ -4,6 +4,7 @@ const {
   BASE_SEARCH_URL,
   buildSearchGoodsParams,
   normalizeOnlineStockResponse,
+  normalizePickupEligibilityResponse,
   normalizeProductIdentifier,
   normalizeSearchGoodsResponse,
   normalizeStorePickupStockResponse,
@@ -104,6 +105,22 @@ async function buildBearerToken(options = {}) {
   return { bearer, uid }
 }
 
+function isAuthBlockedError(error) {
+  return error instanceof DaisoRequestError && (error.status === 401 || error.status === 403)
+}
+
+function normalizeAuthBlockedStock(request, error) {
+  return normalizeStorePickupStockResponse(
+    {
+      success: false,
+      message: "Unauthorized",
+      status: error && error.status,
+      upstreamPayload: error && error.payload ? error.payload : null
+    },
+    request
+  )
+}
+
 async function searchStores(query, options = {}) {
   const body = {
     keyword: String(query || "").trim(),
@@ -144,28 +161,33 @@ async function searchProducts(query, options = {}) {
 }
 
 async function getStorePickupStock(request, options = {}) {
-  const { bearer, uid } = await buildBearerToken(options)
-  const authHeaders = { Authorization: `Bearer ${bearer}`, "X-DM-UID": uid }
+  const body = [{ pdNo: String(request.pdNo), strCd: String(request.strCd) }]
 
-  try {
+  async function requestStockWithFreshToken() {
+    const { bearer, uid } = await buildBearerToken(options)
     const payload = await requestJson(`${BASE_API_URL}/pd/pdh/selStrPkupStck`, {
       ...options,
       method: "POST",
-      headers: authHeaders,
-      body: [{ pdNo: String(request.pdNo), strCd: String(request.strCd) }]
+      headers: { Authorization: `Bearer ${bearer}`, "X-DM-UID": uid },
+      body
     })
 
     return normalizeStorePickupStockResponse(payload, request)
+  }
+
+  try {
+    return await requestStockWithFreshToken()
   } catch (error) {
-    if (error instanceof DaisoRequestError && error.status === 403) {
-      const { bearer: newBearer, uid: newUid } = await buildBearerToken(options)
-      const payload = await requestJson(`${BASE_API_URL}/pd/pdh/selStrPkupStck`, {
-        ...options,
-        method: "POST",
-        headers: { Authorization: `Bearer ${newBearer}`, "X-DM-UID": newUid },
-        body: [{ pdNo: String(request.pdNo), strCd: String(request.strCd) }]
-      })
-      return normalizeStorePickupStockResponse(payload, request)
+    if (!isAuthBlockedError(error)) {
+      throw error
+    }
+  }
+
+  try {
+    return await requestStockWithFreshToken()
+  } catch (error) {
+    if (isAuthBlockedError(error)) {
+      return normalizeAuthBlockedStock(request, error)
     }
 
     throw error
@@ -184,6 +206,73 @@ async function getOnlineStock(request, options = {}) {
   })
 
   return normalizeOnlineStockResponse(payload, normalizedRequest)
+}
+
+function buildPickupEligibilityKeyword(value) {
+  return String(value || "")
+    .replace(/\d+\s*호점\s*$/u, "")
+    .replace(/[(].*?[)]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+}
+
+async function getStorePickupEligibility(request, options = {}) {
+  const pdNo = String(request.pdNo || "").trim()
+  const strCd = String(request.strCd || "").trim()
+  const explicitKeyword =
+    typeof request.keyword === "string" && request.keyword.trim() ? request.keyword.trim() : null
+  const derivedKeyword = explicitKeyword || buildPickupEligibilityKeyword(request.storeName)
+  const pageSize = Number(request.pageSize || 50)
+
+  if (!pdNo) {
+    throw new Error("pdNo is required.")
+  }
+
+  if (strCd && !derivedKeyword) {
+    return {
+      pdNo,
+      strCd,
+      pickupEligible: null,
+      eligibleStoreCount: null,
+      eligibleStores: [],
+      matchedStore: null,
+      searchedKeyword: "",
+      pageSize,
+      totalCount: null,
+      retrievalStatus: "insufficient_coverage",
+      reason: "missing_search_keyword",
+      raw: null
+    }
+  }
+
+  try {
+    const payload = await requestJson(`${BASE_API_URL}/ms/msg/selPkupStr`, {
+      ...options,
+      method: "POST",
+      body: {
+        pdNo,
+        keyword: derivedKeyword || "",
+        currentPage: 1,
+        pageSize
+      }
+    })
+
+    return normalizePickupEligibilityResponse(payload, {
+      pdNo,
+      strCd,
+      keyword: derivedKeyword || "",
+      pageSize
+    })
+  } catch (error) {
+    if (error instanceof DaisoRequestError) {
+      return normalizePickupEligibilityResponse(
+        error.payload || { success: false, message: `HTTP ${error.status}` },
+        { pdNo, strCd, keyword: derivedKeyword || "", pageSize }
+      )
+    }
+
+    throw error
+  }
 }
 
 async function lookupStoreProductAvailability(options = {}) {
@@ -228,6 +317,23 @@ async function lookupStoreProductAvailability(options = {}) {
     getStorePickupStock({ pdNo: selectedProduct.pdNo, strCd: selectedStore.strCd }, options)
   ])
 
+  let pickupEligibility = null
+
+  if (
+    options.includePickupEligibility !== false &&
+    pickupStock &&
+    pickupStock.retrievalStatus === "blocked"
+  ) {
+    pickupEligibility = await getStorePickupEligibility(
+      {
+        pdNo: selectedProduct.pdNo,
+        strCd: selectedStore.strCd,
+        storeName: selectedStore.name
+      },
+      options
+    )
+  }
+
   const onlineStock = await onlineStockPromise
 
   return {
@@ -239,6 +345,7 @@ async function lookupStoreProductAvailability(options = {}) {
     storeDetail: storeDetailPayload.data || null,
     selectedProduct,
     pickupStock,
+    pickupEligibility,
     onlineStock
   }
 }
@@ -246,6 +353,7 @@ async function lookupStoreProductAvailability(options = {}) {
 module.exports = {
   getOnlineStock,
   getStoreDetail,
+  getStorePickupEligibility,
   getStorePickupStock,
   lookupStoreProductAvailability,
   searchProducts,
