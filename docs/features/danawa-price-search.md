@@ -36,6 +36,9 @@ python3 danawa-price-search/scripts/danawa_search.py compare "갤럭시 S25" --l
 - `card_price`: 카드 적용 표시가
 - `card_discount`: 표시가와 카드가 차액
 - `installment`: 무이자 할부 문구
+- `payment_badges`: Danawa가 가격 옆에 노출한 결제조건 배지 텍스트 목록 (예: `["현금"]`, `["쿠폰"]`, `["포인트"]`)
+- `cash_only` / `point_only` / `coupon_only` / `card_only_badge`: 각각 현금·포인트·쿠폰·특정 카드 한정 가격 여부
+- `is_conditional_price`: 위 중 하나라도 True. 일반 카드 결제로는 가격이 다르거나 적용 불가할 수 있음
 - `url`: 다나와 경유 링크
 
 사용자에게는 `total_price` 기준으로 정렬한 Markdown 표를 먼저 보여주고, 카드가는 별도 열에 표시합니다.
@@ -45,3 +48,4 @@ python3 danawa-price-search/scripts/danawa_search.py compare "갤럭시 S25" --l
 - 다나와의 공개 HTML/AJAX 구조가 바뀌면 selector와 파싱 규칙을 갱신해야 합니다.
 - 자동 구매, 로그인, CAPTCHA 우회, 결제 단계 자동화는 이 스킬의 범위가 아닙니다.
 - 동일 상품명이라도 옵션/용량/모델명이 섞일 수 있으므로 검색 후보를 먼저 확인한 뒤 가격비교를 진행합니다.
+- 결제조건 배지(현금/쿠폰/포인트/특정 카드 한정)는 사용자 응답 표에 반드시 라벨로 표시해야 합니다. 정렬은 `total_price` 단일 기준이라 조건부 가격이 1위로 올라올 수 있고, 라벨이 없으면 카드 결제 사용자에게 적용 불가능한 가격을 일반 최저가로 안내하게 됩니다.
