@@ -36,12 +36,14 @@ python3 danawa-price-search/scripts/danawa_search.py compare "갤럭시 S25" --l
 - `card_price`: 카드 적용 표시가
 - `card_discount`: 표시가와 카드가 차액
 - `installment`: 무이자 할부 문구
-- `payment_badges`: Danawa가 가격 옆에 노출한 결제조건 배지 텍스트 목록 (예: `["현금"]`, `["쿠폰"]`, `["포인트"]`, `["할인"]`, `["멤버십"]`)
+- `payment_badges`: Danawa가 가격 옆에 노출한 결제조건 배지의 표시 라벨 목록. 배지 텍스트가 비어 있고 `.ico.cash`처럼 클래스만 있는 경우도 정규화 라벨을 합성합니다 (예: `["현금"]`, `["쿠폰"]`, `["포인트"]`, `["카드"]`, `["할인"]`, `["멤버십"]`)
 - `payment_condition_types`: 화이트리스트 배지를 정규화한 조건 타입 목록 (`cash`/`point`/`coupon`/`card`/`discount`/`membership`)
 - `payment_condition_label`: 사용자 응답용 결제조건 라벨. 복수 조건이면 쉼표로 연결
 - `cash_only` / `point_only` / `coupon_only` / `card_only_badge` / `discount_badge` / `membership_badge`: 각각 현금·포인트·쿠폰·특정 카드·할인·멤버십 조건 가격 여부
 - `is_conditional_price`: `payment_condition_types`가 하나 이상 있으면 True. 일반 카드 결제로는 가격이 다르거나 적용 불가할 수 있음
 - `url`: 다나와 경유 링크
+
+`count`, `normal_count`, `conditional_count`는 `limit` 적용 후 실제 반환된 `offers[]` 기준입니다.
 
 사용자에게는 `total_price` 기준으로 정렬한 Markdown 표를 먼저 보여주고, 카드가는 별도 열에 표시합니다.
 

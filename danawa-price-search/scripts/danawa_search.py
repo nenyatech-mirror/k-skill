@@ -204,32 +204,41 @@ def offers(pcode: str, limit: int = 20, include_shipping: bool = False) -> Dict[
         installment_detail_el = div.select_one(".foi_layer .ly_cont")
         link = div.select_one("a.priceCompareBuyLink")
         # 결제조건 ico만 캡처. 다른 ico(빠른배송, 안내, 상품리뷰 등)는 노이즈라 제외.
-        payment_badge_classes = ("cash", "point", "coupon", "discount", "card", "membership")
-        payment_badge_keywords = ("현금", "포인트", "쿠폰", "할인", "카드", "멤버십")
-        payment_badge_els = []
+        # 클래스만 있고 텍스트가 비어 있는 아이콘도 row 라벨이 누락되지 않도록
+        # 같은 정규화 테이블에서 표시 라벨/타입/boolean 필드를 모두 파생한다.
+        payment_condition_labels = {
+            "cash": "현금",
+            "point": "포인트",
+            "coupon": "쿠폰",
+            "card": "카드",
+            "discount": "할인",
+            "membership": "멤버십",
+        }
+        payment_condition_types: List[str] = []
+        payment_badges: List[str] = []
         for el in div.select(".prc_line .ico, .d_dsc .ico"):
-            classes = el.get("class") or []
+            classes = set(el.get("class") or [])
             text = clean_text(el.get_text(" ", strip=True)) or ""
-            if any(c in payment_badge_classes for c in classes) or any(k in text for k in payment_badge_keywords):
-                payment_badge_els.append(el)
-        payment_badges = [t for t in (clean_text(el.get_text(" ", strip=True)) for el in payment_badge_els) if t]
-        badge_class_tokens = [set(el.get("class") or []) for el in payment_badge_els]
-        cash_only = any("cash" in tok for tok in badge_class_tokens) or any("현금" in b for b in payment_badges)
-        point_only = any("point" in tok for tok in badge_class_tokens) or any("포인트" in b for b in payment_badges)
-        coupon_only = any("coupon" in tok for tok in badge_class_tokens) or any("쿠폰" in b for b in payment_badges)
-        card_only_badge = any("card" in tok for tok in badge_class_tokens) or any("카드" in b for b in payment_badges)
-        discount_badge = any("discount" in tok for tok in badge_class_tokens) or any("할인" in b for b in payment_badges)
-        membership_badge = any("membership" in tok for tok in badge_class_tokens) or any("멤버십" in b for b in payment_badges)
-        payment_condition_checks = (
-            ("cash", "현금", cash_only),
-            ("point", "포인트", point_only),
-            ("coupon", "쿠폰", coupon_only),
-            ("card", "카드", card_only_badge),
-            ("discount", "할인", discount_badge),
-            ("membership", "멤버십", membership_badge),
-        )
-        payment_condition_types = [kind for kind, _label, matched in payment_condition_checks if matched]
-        payment_condition_label = ", ".join(label for _kind, label, matched in payment_condition_checks if matched) or None
+            matched_types = [
+                kind
+                for kind, label in payment_condition_labels.items()
+                if kind in classes or label in text
+            ]
+            if not matched_types:
+                continue
+            for kind in matched_types:
+                if kind not in payment_condition_types:
+                    payment_condition_types.append(kind)
+                label = payment_condition_labels[kind]
+                if label not in payment_badges:
+                    payment_badges.append(label)
+        cash_only = "cash" in payment_condition_types
+        point_only = "point" in payment_condition_types
+        coupon_only = "coupon" in payment_condition_types
+        card_only_badge = "card" in payment_condition_types
+        discount_badge = "discount" in payment_condition_types
+        membership_badge = "membership" in payment_condition_types
+        payment_condition_label = ", ".join(payment_badges) or None
         is_conditional_price = bool(payment_condition_types)
         rows.append(
             {
