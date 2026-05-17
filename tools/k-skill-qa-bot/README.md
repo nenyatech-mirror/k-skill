@@ -1,0 +1,101 @@
+# k-skill-qa-bot
+
+Automated QA daemon for the **k-skill** skill library. Runs every 3 days via macOS launchd, tests every skill via `codex exec --json --sandbox read-only`, has an LLM judge grade pass/fail/skip, and files dedup'd GitHub issues for skills that have broken.
+
+## What it does
+
+1. **Refreshes** a shallow clone of `NomaDamas/k-skill` `main` every 3 days.
+2. **Discovers** every `<skill>/SKILL.md`.
+3. **Classifies** each skill (read-only / location / login / destructive / api-key / proxy-dependent / deprecated).
+4. **Runs** each suitable skill through `codex exec --json --sandbox read-only` with a smoke-test prompt synthesized from the skill's `## When to use` bullets.
+5. **Judges** the result via a second `codex exec` call using a cheaper model and a strict JSON Schema.
+6. **Files** dedup'd issues on `NomaDamas/k-skill` for true failures (with `auto-qa` label). Skipped skills (deprecated, login-required, missing API key) never create issues.
+
+The k-skill repo itself is **never modified** by the bot — it is read-only SSOT. Test prompts are synthesized from each `SKILL.md`.
+
+## Install
+
+Prereqs (one-time):
+
+```bash
+brew install bats-core coreutils gh jq python@3
+pip3 install pyyaml jsonschema pytest
+
+codex --version       # codex-cli >= 0.130
+codex login           # one-time
+
+gh auth login         # one-time, needs `repo` scope
+```
+
+Then:
+
+```bash
+cd /path/to/k-skill
+bash tools/k-skill-qa-bot/install.sh
+```
+
+Re-run `install.sh` to upgrade — it is idempotent and preserves `state/`.
+
+## Configure
+
+The default `CREATE_ISSUES=false` means **the first run does NOT file any issues**. After reviewing the first `summary.md`, opt in:
+
+```bash
+echo 'CREATE_ISSUES=true' >> ~/.local/share/k-skill-qa-bot/.env
+```
+
+Overridable variables (see `config/defaults.sh`):
+
+| Var | Default | Meaning |
+|---|---|---|
+| `CREATE_ISSUES` | `false` | File GH issues for failures |
+| `CODEX_MODEL` | `gpt-5.5` | Model for skill exec |
+| `JUDGE_MODEL` | `gpt-5.4-mini` | Model for LLM judge |
+| `TIMEOUT_SECS` | `180` | Per-skill timeout |
+| `JUDGE_TIMEOUT_SECS` | `60` | Per-judge timeout |
+| `MAX_PARALLEL` | `4` | Concurrent skill tests |
+| `LAST_RUN_MIN_AGE` | `259200` | Min seconds between runs (72h) |
+| `GH_REPO` | `NomaDamas/k-skill` | Where to file issues |
+
+`config/skill-overrides.yml` controls per-skill `force_skip` and category overrides. Destructive booking flows (`ktx-booking`, `srt-booking`, `catchtable-sniper`, etc.) and session-required skills (`kakaotalk-mac`, `hipass-receipt`, `toss-securities`, `iros-registry-automation`) are force-skipped by default so the bot never abuses an account.
+
+## Logs and inspection
+
+```bash
+tail -f ~/Library/Logs/k-skill-qa-bot/stderr.log
+cat ~/.local/share/k-skill-qa-bot/state/runs/$(ls -t ~/.local/share/k-skill-qa-bot/state/runs/ | head -1)/summary.md
+```
+
+The bot keeps the most recent 12 runs and purges older ones.
+
+## Force a run
+
+```bash
+~/.local/share/k-skill-qa-bot/bin/run-qa.sh --force
+~/.local/share/k-skill-qa-bot/bin/run-qa.sh --force --only kbo-results
+~/.local/share/k-skill-qa-bot/bin/run-qa.sh --force --dry-run     # no issues regardless of CREATE_ISSUES
+```
+
+## Uninstall
+
+```bash
+bash ~/.local/share/k-skill-qa-bot/uninstall.sh
+bash ~/.local/share/k-skill-qa-bot/uninstall.sh --yes --purge --purge-logs
+```
+
+## Safety
+
+- `--sandbox read-only` pins the codex sandbox.
+- 10 destructive/login-required skills are force-skipped before any codex call is issued.
+- Deprecated skills (`~~name~~ ⚠️ 지원 중단` in README) are detected and skipped.
+- `update-clone.sh` refuses any `K_SKILL_CLONE` outside `K_QA_HOME/k-skill-clone` unless `ALLOW_EXTERNAL_CLONE_TARGET=1` (prevents the script from git-reset'ing the wrong directory).
+- `CREATE_ISSUES=false` first-run default prevents accidental issue spam.
+- Local state only: `~/.local/share/k-skill-qa-bot/`. No network egress except git fetch, codex API, gh API, k-skill-proxy health check.
+
+## Troubleshooting
+
+- `codex: command not found` → check the plist's `EnvironmentVariables.PATH`. Default is `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`.
+- `gh: not authenticated` → run `gh auth login` with `repo` scope.
+- `gtimeout: command not found` → `brew install coreutils`.
+- LaunchAgent state via `launchctl print "gui/$(id -u)/org.nomadamas.k-skill-qa-bot" | head`.
+- Force a re-run: `launchctl kickstart -k "gui/$(id -u)/org.nomadamas.k-skill-qa-bot"`.

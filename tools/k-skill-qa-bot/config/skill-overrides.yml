@@ -1,0 +1,34 @@
+ktx-booking:
+  force_skip: true
+  reason: "destructive booking flow (requires Korail login + reservation)"
+srt-booking:
+  force_skip: true
+  reason: "destructive booking flow (requires SRT login + reservation)"
+express-bus-booking:
+  force_skip: true
+  reason: "destructive booking flow (Tmoney reservation)"
+intercity-bus-booking:
+  force_skip: true
+  reason: "destructive booking flow (Tmoney reservation)"
+foresttrip-vacancy:
+  force_skip: true
+  reason: "destructive booking flow (foresttrip.go.kr reservation)"
+catchtable-sniper:
+  force_skip: true
+  reason: "destructive reservation flow (requires logged-in Chrome session)"
+
+kakaotalk-mac:
+  force_skip: true
+  reason: "requires logged-in KakaoTalk macOS app session"
+hipass-receipt:
+  force_skip: true
+  reason: "requires logged-in HiPass session in Chrome"
+toss-securities:
+  force_skip: true
+  reason: "requires logged-in Toss Securities session"
+iros-registry-automation:
+  force_skip: true
+  reason: "requires IROS login + manual payment"
+
+bunjang-search:
+  test_path: "search-only"

@@ -1,0 +1,27 @@
+# tools/k-skill-qa-bot — Agent instructions
+
+Source tree for **k-skill-qa-bot**, an automated QA daemon for the k-skill repository.
+
+## What this is
+
+- Source for an **external** macOS daemon installed at `~/.local/share/k-skill-qa-bot/`.
+- Every 3 days (launchd LaunchAgent), the daemon:
+  1. Refreshes a shallow clone of `NomaDamas/k-skill` `main`.
+  2. Discovers every `<skill>/SKILL.md`, classifies each skill (read-only / location / login / destructive / api-key / proxy-dependent / deprecated).
+  3. Runs each suitable skill through `codex exec` (read-only sandbox) with a smoke-test prompt synthesized from the skill's `## When to use`.
+  4. An LLM judge (`codex exec --output-schema`) grades pass / fail / skip.
+  5. Failed skills are filed as dedup'd issues on `NomaDamas/k-skill`. Skipped skills (login required, deprecated, missing API key) never create issues.
+
+## Install path
+
+After running `install.sh`, the runtime lives at `~/.local/share/k-skill-qa-bot/`.
+
+The k-skill repository itself is **never modified** by the bot — it is read-only SSOT. Test prompts are synthesized from each `SKILL.md`.
+
+## Design rules
+
+- **SSOT**: All test prompts and skill metadata come from `SKILL.md` files in the bot's own shallow clone of `NomaDamas/k-skill` `main`. The k-skill repo gets no QA-bot-specific edits.
+- **First-run safety**: `CREATE_ISSUES=false` is the default. Users must opt in by writing `CREATE_ISSUES=true` to `~/.local/share/k-skill-qa-bot/.env`.
+- **Deprecated skills**: Detected by parsing the cloned `README.md` for `~~`…`~~` strike-through and `⚠️ 지원 중단` markers. Always SKIPPED, never failed.
+- **Login / destructive skills**: Force-skipped via `config/skill-overrides.yml`. Never filed as issues.
+- **`update-clone.sh` self-destruction guard**: Refuses to operate if `K_SKILL_CLONE` resolves to a directory that does not look like a managed-by-the-bot clone (no `state/clone-head` ancestor, or matches the development tree). Required after a real incident where the script git-reset the very tree it lived in.
