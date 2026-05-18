@@ -84,6 +84,7 @@ npx --yes skills add <owner/repo> \
   --skill market-kurly-search \
   --skill gangnamunni-clinic-search \
   --skill olive-young-search \
+  --skill korean-cinema-search \
   --skill hola-poke-yeoksam \
   --skill blue-ribbon-nearby \
   --skill kakao-bar-nearby \
@@ -203,6 +204,40 @@ node dist/bin.js health
 node dist/bin.js get /api/oliveyoung/stores --keyword 명동 --limit 5 --json
 node dist/bin.js get /api/oliveyoung/products --keyword 선크림 --size 5 --json
 node dist/bin.js get /api/oliveyoung/inventory --keyword 선크림 --storeKeyword 명동 --size 5 --json
+```
+
+### `korean-cinema-search` upstream CLI quickstart
+
+`korean-cinema-search` 는 upstream 원본 [`hmmhmmhm/daiso-mcp`](https://github.com/hmmhmmhm/daiso-mcp) / npm package [`daiso`](https://www.npmjs.com/package/daiso) 를 그대로 사용한다.
+
+- 기본 경로는 **MCP 서버 직접 설치가 아니라 CLI first** 다.
+- 가장 빠른 smoke test 는 `npx --yes daiso health`
+- CGV, 메가박스, 롯데시네마의 영화관, 상영작, 시간표, 잔여석 조회를 다룬다.
+- 날짜가 있는 요청은 Asia/Seoul 기준 `YYYYMMDD` 로 바꿔 `--playDate <YYYYMMDD>` 를 명시한다.
+- 예매와 결제는 자동화하지 않는다.
+- 반복 사용이면 `npm install -g daiso`
+- public endpoint는 upstream 상태에 따라 간헐적인 `5xx/503` 이 날 수 있으니 먼저 한두 번 재시도한다.
+- 재시도 후에도 불안정하거나 버전 고정/원본 확인이 필요하면 `git clone https://github.com/hmmhmmhm/daiso-mcp.git && cd daiso-mcp && npm install && npm run build` clone fallback으로 전환한 뒤 `node dist/bin.js ...` 로 실행한다.
+
+```bash
+npx --yes daiso health
+npx --yes daiso get /api/cgv/theaters --keyword 강남 --limit 5 --json
+npx --yes daiso get /api/cgv/timetable --keyword 강남 --playDate <YYYYMMDD> --json
+npx --yes daiso get /api/megabox/theaters --keyword 코엑스 --limit 5 --json
+npx --yes daiso get /api/megabox/seats --keyword 코엑스 --playDate <YYYYMMDD> --limit 10 --json
+npx --yes daiso get /api/lottecinema/theaters --keyword 월드타워 --limit 5 --json
+npx --yes daiso get /api/lottecinema/seats --keyword 월드타워 --playDate <YYYYMMDD> --limit 10 --json
+```
+
+clone fallback 예시:
+
+```bash
+git clone https://github.com/hmmhmmhm/daiso-mcp.git
+cd daiso-mcp
+npm install
+npm run build
+node dist/bin.js health
+node dist/bin.js get /api/cgv/timetable --keyword 강남 --playDate <YYYYMMDD> --json
 ```
 
 ### `bunjang-search` upstream CLI quickstart
