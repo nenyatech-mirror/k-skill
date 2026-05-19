@@ -110,8 +110,9 @@
 - 다이소몰 상품 검색 요약: https://www.daisomall.co.kr/ssn/search/Search
 - 다이소몰 상품 검색 목록: https://www.daisomall.co.kr/ssn/search/SearchGoods
 - 다이소몰 상품 요약 목록: https://www.daisomall.co.kr/ssn/search/GoodsMummResult
-- 다이소몰 매장 픽업 재고: https://www.daisomall.co.kr/api/pd/pdh/selStrPkupStck (2026-05-05 기준 Unauthorized 차단 가능)
-- 다이소몰 매장 픽업 가능 매장 목록: https://www.daisomall.co.kr/api/ms/msg/selPkupStr (특정 상품의 픽업 가능 매장 리스트, 매장 수량은 미제공)
+- 다이소몰 비로그인 인증: https://www.daisomall.co.kr/api/auth/request (응답 바디: JWT 평문, 응답 헤더 x-dm-uid; AES-128-CBC / 키 PRE_AUTH_ENC_KEY 로 암호화 후 Bearer 헤더로 전달)
+- 다이소몰 매장 픽업 재고: https://www.daisomall.co.kr/api/pd/pdh/selStrPkupStck (Authorization: Bearer 헤더 필요)
+- 다이소몰 매장 픽업 가능 여부 fallback: https://www.daisomall.co.kr/api/ms/msg/selPkupStr (Bearer 재고 조회가 401/403으로 계속 막힐 때 `pickupEligibility` 보조 정보로 사용)
 - 다이소몰 온라인 재고: https://www.daisomall.co.kr/api/pdo/selOnlStck
 - 강남언니 공개 검색: https://www.gangnamunni.com/search?q=<keyword>
 - 강남언니 공개 병원 페이지: https://www.gangnamunni.com/hospitals/<id>
@@ -124,12 +125,26 @@
 - olive-young products API: https://mcp.aka.page/api/oliveyoung/products
 - olive-young inventory API: https://mcp.aka.page/api/oliveyoung/inventory
 - daiso/olive-young public MCP endpoint: https://mcp.aka.page/mcp
+- korean-cinema upstream repo (`hmmhmmhm/daiso-mcp`): https://github.com/hmmhmmhm/daiso-mcp
+- korean-cinema CLI package (`daiso`): https://www.npmjs.com/package/daiso
+- CGV theaters API: https://mcp.aka.page/api/cgv/theaters
+- CGV movies API: https://mcp.aka.page/api/cgv/movies
+- CGV timetable API: https://mcp.aka.page/api/cgv/timetable
+- Megabox theaters API: https://mcp.aka.page/api/megabox/theaters
+- Megabox movies API: https://mcp.aka.page/api/megabox/movies
+- Megabox seats API: https://mcp.aka.page/api/megabox/seats
+- Lotte Cinema theaters API: https://mcp.aka.page/api/lottecinema/theaters
+- Lotte Cinema movies API: https://mcp.aka.page/api/lottecinema/movies
+- Lotte Cinema seats API: https://mcp.aka.page/api/lottecinema/seats
 - hola-poke-yeoksam reference repo: https://github.com/mnspkm/hola-poke-yeoksam-skill
 - hola-poke-yeoksam remote MCP endpoint: https://hola-poke-yeoksam-skill.onrender.com/mcp
 - retention-corp/coupang_partners (Coupang Partners client and local MCP-compatible layer): https://github.com/retention-corp/coupang_partners
 - coupang_partners local MCP contract: local://coupang-mcp
 - coupang_partners hosted fallback (credentialless, allowlist-gated): https://a.retn.kr/v1/public/assist
 - coupang_partners hosted fallback PR (merged): https://github.com/retention-corp/coupang_partners/pull/1
+- 오늘의집 오늘의딜 공개 페이지: https://ohou.se/commerces/today_deals
+- 오늘의집 오늘의딜 canonical/OG URL: https://store.ohou.se/today_deals
+- 오늘의집 오늘의딜 데이터 표면: HTML `__NEXT_DATA__`의 `today-deal-feed`
 - bunjang-cli package: https://www.npmjs.com/package/bunjang-cli
 - bunjang-cli repo: https://github.com/pinion05/bunjangcli
 - 당근 메인: https://www.daangn.com/
@@ -191,3 +206,7 @@
 - 도서관 정보나루 도서 상세 endpoint: https://data4library.kr/api/srchDtlList
 - 도서관 정보나루 도서 소장 도서관 endpoint: https://data4library.kr/api/libSrchByBook
 - 도서관 정보나루 도서관별 도서 소장여부 endpoint: https://data4library.kr/api/bookExist
+
+- 공공데이터포털 데이터셋(창업진흥원 K-Startup 조회서비스): https://www.data.go.kr/data/15125364/openapi.do
+- K-Startup Open API base URL: https://apis.data.go.kr/B552735/kisedKstartupService01 — `k-skill-proxy`의 `/v1/kstartup/business-info`, `/v1/kstartup/announcements`, `/v1/kstartup/contents`, `/v1/kstartup/statistics` 가 각각 `getBusinessInformation01`, `getAnnouncementInformation01`, `getContentInformation01`, `getStatisticalInformation01` 로 중계한다 (returnType=json 고정, ServiceKey 서버 측 주입)
+- K-Startup 공식 포털: https://www.k-startup.go.kr — 응답의 `detl_pg_url` 가 가리키는 사용자 진입점

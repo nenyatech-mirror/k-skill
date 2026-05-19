@@ -203,6 +203,43 @@ def offers(pcode: str, limit: int = 20, include_shipping: bool = False) -> Dict[
         installment_el = div.select_one(".btn_foi .txt")
         installment_detail_el = div.select_one(".foi_layer .ly_cont")
         link = div.select_one("a.priceCompareBuyLink")
+        # 결제조건 ico만 캡처. 다른 ico(빠른배송, 안내, 상품리뷰 등)는 노이즈라 제외.
+        # 클래스만 있고 텍스트가 비어 있는 아이콘도 row 라벨이 누락되지 않도록
+        # 같은 정규화 테이블에서 표시 라벨/타입/boolean 필드를 모두 파생한다.
+        payment_condition_labels = {
+            "cash": "현금",
+            "point": "포인트",
+            "coupon": "쿠폰",
+            "card": "카드",
+            "discount": "할인",
+            "membership": "멤버십",
+        }
+        payment_condition_types: List[str] = []
+        payment_badges: List[str] = []
+        for el in div.select(".prc_line .ico, .d_dsc .ico"):
+            classes = set(el.get("class") or [])
+            text = clean_text(el.get_text(" ", strip=True)) or ""
+            matched_types = [
+                kind
+                for kind, label in payment_condition_labels.items()
+                if kind in classes or label in text
+            ]
+            if not matched_types:
+                continue
+            for kind in matched_types:
+                if kind not in payment_condition_types:
+                    payment_condition_types.append(kind)
+                label = payment_condition_labels[kind]
+                if label not in payment_badges:
+                    payment_badges.append(label)
+        cash_only = "cash" in payment_condition_types
+        point_only = "point" in payment_condition_types
+        coupon_only = "coupon" in payment_condition_types
+        card_only_badge = "card" in payment_condition_types
+        discount_badge = "discount" in payment_condition_types
+        membership_badge = "membership" in payment_condition_types
+        payment_condition_label = ", ".join(payment_badges) or None
+        is_conditional_price = bool(payment_condition_types)
         rows.append(
             {
                 "mall": clean_text(mall),
@@ -220,12 +257,44 @@ def offers(pcode: str, limit: int = 20, include_shipping: bool = False) -> Dict[
                 "card_discount_text": f"{price - card_price:,}원" if card_price else None,
                 "installment": clean_text(installment_el.get_text(" ", strip=True)) if installment_el else None,
                 "installment_detail": clean_text(installment_detail_el.get_text(" ", strip=True)) if installment_detail_el else None,
+                "payment_badges": payment_badges,
+                "cash_only": cash_only,
+                "point_only": point_only,
+                "coupon_only": coupon_only,
+                "card_only_badge": card_only_badge,
+                "discount_badge": discount_badge,
+                "membership_badge": membership_badge,
+                "payment_condition_types": payment_condition_types,
+                "payment_condition_label": payment_condition_label,
+                "is_conditional_price": is_conditional_price,
                 "url": abs_url(link.get("href") if link else None),
             }
         )
-    rows.sort(key=lambda row: (row["total_price"] is None, row["total_price"] or row["price"], row["price"], row["mall"] or ""))
+    # 정렬은 단순히 배송비 포함 실구매가 오름차순. 결제조건(현금/쿠폰/포인트/특정카드)은
+    # 분리 그룹으로 묶지 않고 row 단위로 payment_badges / payment_condition_types /
+    # payment_condition_label 및 세부 boolean 플래그로 노출한다. 호출자(또는 사용자)는 자기 결제수단에 맞춰 판단한다.
+    rows.sort(key=lambda row: (
+        row["total_price"] is None,
+        row["total_price"] or row["price"],
+        row["price"],
+        row["mall"] or "",
+    ))
     rows = rows[:limit]
-    return {"pcode": str(pcode), "title": meta.get("sProductFullName"), "source_url": meta["source_url"], "count": len(rows), "offers": rows, "meta": {"extraction": "danawa-price-ajax", "include_shipping": include_shipping, "sort": "total_price", "ts": int(time.time())}}
+    return {
+        "pcode": str(pcode),
+        "title": meta.get("sProductFullName"),
+        "source_url": meta["source_url"],
+        "count": len(rows),
+        "normal_count": sum(1 for r in rows if not r.get("is_conditional_price")),
+        "conditional_count": sum(1 for r in rows if r.get("is_conditional_price")),
+        "offers": rows,
+        "meta": {
+            "extraction": "danawa-price-ajax",
+            "include_shipping": include_shipping,
+            "sort": "total_price",
+            "ts": int(time.time()),
+        },
+    }
 
 
 def compare(query: str, limit: int, offer_limit: int) -> Dict[str, Any]:
