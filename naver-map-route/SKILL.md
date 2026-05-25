@@ -10,6 +10,8 @@ metadata:
 
 # Naver Map Route (네이버 지도 길찾기 MVP)
 
+> ⚠️ **현재 미작동 (2026-05-25)**: NCP Maps 운영자 키가 프록시 서버에 아직 설정되지 않아 live 모드가 동작하지 않습니다. mock fallback만 사용 가능합니다. NCP 결제수단 등록 완료 후 키를 설정하면 이 안내를 제거합니다.
+
 ## What this skill does
 
 사용자가 `/route` 또는 `/이동루트` 명령으로 출발지·목적지를 직접 입력하면, **NAVER Cloud Platform Maps Directions 5** 결과를 `k-skill-proxy` 경유로 조회하여 거리·소요 시간·통행료·연료비를 요약한다.

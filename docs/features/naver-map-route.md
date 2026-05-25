@@ -1,5 +1,7 @@
 # 네이버맵 길찾기 가이드
 
+> ⚠️ **현재 미작동 (2026-05-25)**: NCP Maps 운영자 키(`NAVER_MAP_CLIENT_ID`/`NAVER_MAP_CLIENT_SECRET`)가 아직 프록시 서버에 설정되지 않아 모든 `/v1/naver-map/*` 라우트가 `503 upstream_not_configured`를 반환합니다. 스킬은 mock fallback으로 동작합니다. NCP 결제수단 등록이 완료되는 대로 키를 설정하고 이 안내를 제거할 예정입니다.
+
 ## 이 기능으로 할 수 있는 일
 
 - 출발지·목적지를 좌표(`lng,lat`) 또는 주소로 받아 NAVER Cloud Platform Maps Directions 5 결과를 `k-skill-proxy` 경유로 조회
