@@ -21,6 +21,14 @@ const {
 } = require("./lh-notice");
 const { fetchTransactions, VALID_ASSET_TYPES, VALID_DEAL_TYPES } = require("./molit");
 const {
+  fetchKakaoLocalEndpoint,
+  fetchKakaoMobilityDirections,
+  normalizeKakaoCategorySearchQuery,
+  normalizeKakaoCoordToAddressQuery,
+  normalizeKakaoKeywordSearchQuery,
+  normalizeKakaoMobilityDirectionsQuery
+} = require("./kakao-map");
+const {
   fetchNaverMapDirections,
   fetchNaverMapGeocode,
   fetchNaverMapReverseGeocode,
@@ -1908,6 +1916,8 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
         neisSchoolMealConfigured: Boolean(config.keduInfoKey),
         krxConfigured: Boolean(config.krxApiKey),
         kakaoLocalConfigured: Boolean(config.kakaoRestApiKey),
+        kakaoMapConfigured: Boolean(config.kakaoRestApiKey),
+        kakaoMobilityConfigured: Boolean(config.kakaoRestApiKey),
         kosisConfigured: Boolean(config.kosisApiKey),
         naverShoppingConfigured: true,
         naverSearchApiConfigured: naverSearchKeysPresent,
@@ -4190,6 +4200,76 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
     return payload;
   });
 
+  async function handleKakaoLocalEndpointRoute({
+    request,
+    reply,
+    route,
+    endpoint,
+    normalize
+  }) {
+    let normalized;
+    try {
+      normalized = normalize(request.query || {});
+    } catch (error) {
+      reply.code(400);
+      return {
+        error: "bad_request",
+        message: error.message
+      };
+    }
+
+    const cacheKey = makeCacheKey({ route, ...normalized });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return {
+        ...cached,
+        proxy: {
+          ...cached.proxy,
+          cache: { hit: true, ttl_ms: config.cacheTtlMs }
+        }
+      };
+    }
+
+    let result;
+    try {
+      result = await fetchKakaoLocalEndpoint({
+        endpoint,
+        params: normalized,
+        apiKey: config.kakaoRestApiKey
+      });
+    } catch (error) {
+      reply.code(error.statusCode && error.statusCode >= 400 ? error.statusCode : 502);
+      const payload = {
+        error: error.code || "proxy_error",
+        message: error.message,
+        proxy: {
+          name: config.proxyName,
+          cache: { hit: false, ttl_ms: config.cacheTtlMs }
+        }
+      };
+      if (error.upstreamStatusCode) {
+        payload.upstream = {
+          status_code: error.upstreamStatusCode,
+          body_snippet: error.upstreamBodySnippet || null
+        };
+      }
+      return payload;
+    }
+
+    const payload = {
+      ...result.body,
+      proxy: {
+        name: config.proxyName,
+        cache: { hit: false, ttl_ms: config.cacheTtlMs },
+        requested_at: new Date().toISOString()
+      }
+    };
+
+    cache.set(cacheKey, payload, config.cacheTtlMs);
+    reply.code(result.statusCode);
+    reply.header("content-type", "application/json; charset=utf-8");
+    return payload;
+  }
 
   async function handleNaverMapRoute({
     request,
@@ -4209,7 +4289,6 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
         message: error.message
       };
     }
-
     const cacheKey = makeCacheKey({ route, ...normalized, ...cacheKeyExtra });
     const cached = cache.get(cacheKey);
     if (cached) {
@@ -4264,6 +4343,102 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
     reply.header("content-type", "application/json; charset=utf-8");
     return payload;
   }
+
+  app.get("/v1/kakao-map/search/keyword", async (request, reply) => handleKakaoLocalEndpointRoute({
+    request,
+    reply,
+    route: "kakao-map-search-keyword",
+    endpoint: "keyword",
+    normalize: normalizeKakaoKeywordSearchQuery
+  }));
+
+  app.get("/v1/kakao-map/search/category", async (request, reply) => handleKakaoLocalEndpointRoute({
+    request,
+    reply,
+    route: "kakao-map-search-category",
+    endpoint: "category",
+    normalize: normalizeKakaoCategorySearchQuery
+  }));
+
+  app.get("/v1/kakao-map/coord2address", async (request, reply) => handleKakaoLocalEndpointRoute({
+    request,
+    reply,
+    route: "kakao-map-coord2address",
+    endpoint: "coord2address",
+    normalize: normalizeKakaoCoordToAddressQuery
+  }));
+
+  app.get("/v1/kakao-map/coord2region", async (request, reply) => handleKakaoLocalEndpointRoute({
+    request,
+    reply,
+    route: "kakao-map-coord2region",
+    endpoint: "coord2region",
+    normalize: normalizeKakaoCoordToAddressQuery
+  }));
+
+  app.get("/v1/kakao-mobility/directions", async (request, reply) => {
+    let normalized;
+    try {
+      normalized = normalizeKakaoMobilityDirectionsQuery(request.query || {});
+    } catch (error) {
+      reply.code(400);
+      return {
+        error: "bad_request",
+        message: error.message
+      };
+    }
+
+    const cacheKey = makeCacheKey({ route: "kakao-mobility-directions", ...normalized });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return {
+        ...cached,
+        proxy: {
+          ...cached.proxy,
+          cache: { hit: true, ttl_ms: config.cacheTtlMs }
+        }
+      };
+    }
+
+    let result;
+    try {
+      result = await fetchKakaoMobilityDirections({
+        ...normalized,
+        apiKey: config.kakaoRestApiKey
+      });
+    } catch (error) {
+      reply.code(error.statusCode && error.statusCode >= 400 ? error.statusCode : 502);
+      const payload = {
+        error: error.code || "proxy_error",
+        message: error.message,
+        proxy: {
+          name: config.proxyName,
+          cache: { hit: false, ttl_ms: config.cacheTtlMs }
+        }
+      };
+      if (error.upstreamStatusCode) {
+        payload.upstream = {
+          status_code: error.upstreamStatusCode,
+          body_snippet: error.upstreamBodySnippet || null
+        };
+      }
+      return payload;
+    }
+
+    const payload = {
+      ...result.body,
+      proxy: {
+        name: config.proxyName,
+        cache: { hit: false, ttl_ms: config.cacheTtlMs },
+        requested_at: new Date().toISOString()
+      }
+    };
+
+    cache.set(cacheKey, payload, config.cacheTtlMs);
+    reply.code(result.statusCode);
+    reply.header("content-type", "application/json; charset=utf-8");
+    return payload;
+  });
 
   app.get("/v1/naver-map/directions", async (request, reply) => handleNaverMapRoute({
     request,
@@ -4904,6 +5079,10 @@ module.exports = {
   normalizeFineDustQuery,
   normalizeHanRiverWaterLevelQuery,
   normalizeKakaoLocalGeocodeQuery,
+  normalizeKakaoKeywordSearchQuery,
+  normalizeKakaoCategorySearchQuery,
+  normalizeKakaoCoordToAddressQuery,
+  normalizeKakaoMobilityDirectionsQuery,
   normalizeNaverMapDirectionsQuery,
   normalizeNaverMapGeocodeQuery,
   normalizeNaverMapReverseGeocodeQuery,
@@ -4939,6 +5118,8 @@ module.exports = {
   proxyKmaWeatherRequest,
   proxyKosisRequest,
   proxyKstartupRequest,
+  fetchKakaoLocalEndpoint,
+  fetchKakaoMobilityDirections,
   fetchNaverMapDirections,
   fetchNaverMapGeocode,
   fetchNaverMapReverseGeocode,

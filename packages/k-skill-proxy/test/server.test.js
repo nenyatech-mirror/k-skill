@@ -709,6 +709,428 @@ test("Kakao Local geocode endpoint falls back from address to keyword and caches
   assert.equal(new URL(calls[0]).searchParams.get("apiKey"), null);
 });
 
+test("Kakao Map keyword search injects KakaoAK header, forwards x/y/radius/sort, and caches", async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), headers: options.headers });
+    return new Response(
+      JSON.stringify({
+        meta: { total_count: 1, pageable_count: 1, is_end: true },
+        documents: [
+          { place_name: "스타벅스 강남R점", x: "127.027619", y: "37.497946", distance: "120" }
+        ]
+      }),
+      { status: 200, headers: { "content-type": "application/json;charset=UTF-8" } }
+    );
+  };
+
+  const app = buildServer({
+    env: {
+      KAKAO_REST_API_KEY: "server-kakao-key"
+    }
+  });
+
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const url = "/v1/kakao-map/search/keyword?q=" + encodeURIComponent("스타벅스") + "&x=127.0276&y=37.4979&radius=500&sort=distance&apiKey=client-key";
+  const first = await app.inject({ method: "GET", url });
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.json().documents[0].place_name, "스타벅스 강남R점");
+  assert.equal(first.json().proxy.cache.hit, false);
+
+  const second = await app.inject({ method: "GET", url });
+  assert.equal(second.json().proxy.cache.hit, true);
+
+  assert.equal(calls.length, 1, "second request should be served from proxy cache");
+  const parsed = new URL(calls[0].url);
+  assert.equal(parsed.origin + parsed.pathname, "https://dapi.kakao.com/v2/local/search/keyword.json");
+  assert.equal(parsed.searchParams.get("query"), "스타벅스");
+  assert.equal(parsed.searchParams.get("x"), "127.0276");
+  assert.equal(parsed.searchParams.get("y"), "37.4979");
+  assert.equal(parsed.searchParams.get("radius"), "500");
+  assert.equal(parsed.searchParams.get("sort"), "distance");
+  assert.equal(parsed.searchParams.get("apiKey"), null);
+  assert.equal(calls[0].headers.authorization, "KakaoAK server-kakao-key");
+});
+
+test("Kakao Map keyword search validates coordinate pairing and radius bounds", async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), headers: options.headers ?? {} });
+    return jsonResponse({ documents: [], meta: { total_count: 0 } });
+  };
+
+  const app = buildServer({
+    env: { KAKAO_REST_API_KEY: "server-kakao-key" }
+  });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const missingY = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/search/keyword?q=hi&x=127.0"
+  });
+  assert.equal(missingY.statusCode, 400);
+
+  const badSort = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/search/keyword?q=hi&sort=newest"
+  });
+  assert.equal(badSort.statusCode, 400);
+
+  const badRadius = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/search/keyword?q=hi&x=127.0&y=37.5&radius=99999"
+  });
+  assert.equal(badRadius.statusCode, 400);
+
+  const radiusWithoutCoords = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/search/keyword?q=hi&radius=500"
+  });
+  assert.equal(radiusWithoutCoords.statusCode, 400);
+  assert.match(radiusWithoutCoords.json().message, /radius/i);
+
+  const distanceSortWithoutCoords = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/search/keyword?q=hi&sort=distance"
+  });
+  assert.equal(distanceSortWithoutCoords.statusCode, 400);
+  assert.match(distanceSortWithoutCoords.json().message, /sort=distance/i);
+  assert.equal(calls.length, 0, "validation failures should not call Kakao upstream");
+});
+
+test("Kakao Map category search rejects unsupported category group codes", async (t) => {
+  const app = buildServer({
+    env: { KAKAO_REST_API_KEY: "server-kakao-key" }
+  });
+  t.after(async () => {
+    await app.close();
+  });
+
+  const bad = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/search/category?category_group_code=XX9&x=127.0&y=37.5"
+  });
+  assert.equal(bad.statusCode, 400);
+
+  const missing = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/search/category?category_group_code=FD6"
+  });
+  assert.equal(missing.statusCode, 400);
+});
+
+test("Kakao Map category search routes to /search/category.json with FD6 and coords", async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), headers: options.headers });
+    return new Response(
+      JSON.stringify({
+        meta: { total_count: 0, pageable_count: 0, is_end: true },
+        documents: []
+      }),
+      { status: 200, headers: { "content-type": "application/json;charset=UTF-8" } }
+    );
+  };
+
+  const app = buildServer({
+    env: { KAKAO_REST_API_KEY: "k" }
+  });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/search/category?category_group_code=FD6&x=127.0276&y=37.4979&radius=300"
+  });
+  assert.equal(response.statusCode, 200);
+  const parsed = new URL(calls[0].url);
+  assert.equal(parsed.origin + parsed.pathname, "https://dapi.kakao.com/v2/local/search/category.json");
+  assert.equal(parsed.searchParams.get("category_group_code"), "FD6");
+});
+
+test("Kakao Map coord2region routes to /geo/coord2regioncode.json with input_coord", async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    return new Response(
+      JSON.stringify({
+        meta: { total_count: 1 },
+        documents: [{ region_type: "B", address_name: "서울특별시 강남구 역삼동" }]
+      }),
+      { status: 200, headers: { "content-type": "application/json;charset=UTF-8" } }
+    );
+  };
+
+  const app = buildServer({
+    env: { KAKAO_REST_API_KEY: "k" }
+  });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/coord2region?x=127.0276&y=37.4979&input_coord=WGS84"
+  });
+  assert.equal(response.statusCode, 200);
+  assert.match(response.json().documents[0].address_name, /강남구/);
+  const parsed = new URL(calls[0]);
+  assert.equal(parsed.origin + parsed.pathname, "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json");
+  assert.equal(parsed.searchParams.get("input_coord"), "WGS84");
+});
+
+test("Kakao Map coord2address routes to /geo/coord2address.json with x/y", async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    return new Response(
+      JSON.stringify({
+        meta: { total_count: 1 },
+        documents: [
+          {
+            road_address: { address_name: "서울 강남구 테헤란로 521" },
+            address: { address_name: "서울 강남구 역삼동" }
+          }
+        ]
+      }),
+      { status: 200, headers: { "content-type": "application/json;charset=UTF-8" } }
+    );
+  };
+
+  const app = buildServer({
+    env: { KAKAO_REST_API_KEY: "k" }
+  });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-map/coord2address?x=127.0276&y=37.4979"
+  });
+  assert.equal(response.statusCode, 200);
+  assert.match(response.json().documents[0].road_address.address_name, /테헤란로/);
+  const parsed = new URL(calls[0]);
+  assert.equal(parsed.origin + parsed.pathname, "https://dapi.kakao.com/v2/local/geo/coord2address.json");
+});
+
+test("Kakao Map endpoints return 503 when KAKAO_REST_API_KEY is missing", async (t) => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => {
+    throw new Error("upstream should not be called without API key");
+  };
+
+  const app = buildServer({ env: {} });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const urls = [
+    "/v1/kakao-map/search/keyword?q=hi",
+    "/v1/kakao-map/search/category?category_group_code=FD6&x=127&y=37.5",
+    "/v1/kakao-map/coord2address?x=127&y=37.5",
+    "/v1/kakao-map/coord2region?x=127&y=37.5",
+    "/v1/kakao-mobility/directions?origin=127.0,37.5&destination=127.1,37.6"
+  ];
+  for (const url of urls) {
+    const response = await app.inject({ method: "GET", url });
+    assert.equal(response.statusCode, 503, `${url} should report 503 when key is missing`);
+    assert.equal(response.json().error, "upstream_not_configured");
+  }
+});
+
+test("Kakao Mobility directions endpoint injects KakaoAK, forwards priority/options, and caches", async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), headers: options.headers });
+    return new Response(
+      JSON.stringify({
+        trans_id: "abc",
+        routes: [
+          {
+            result_code: 0,
+            result_msg: "성공",
+            summary: { distance: 12345, duration: 1200, fare: { taxi: 12000, toll: 1000 } }
+          }
+        ]
+      }),
+      { status: 200, headers: { "content-type": "application/json;charset=UTF-8" } }
+    );
+  };
+
+  const app = buildServer({ env: { KAKAO_REST_API_KEY: "mob-key" } });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const url = "/v1/kakao-mobility/directions?origin=126.9706,37.5559&destination=127.0276,37.4979&priority=TIME&car_fuel=GASOLINE&alternatives=true";
+  const first = await app.inject({ method: "GET", url });
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.json().routes[0].result_code, 0);
+
+  const second = await app.inject({ method: "GET", url });
+  assert.equal(second.json().proxy.cache.hit, true);
+  assert.equal(calls.length, 1);
+
+  const parsed = new URL(calls[0].url);
+  assert.equal(parsed.origin + parsed.pathname, "https://apis-navi.kakaomobility.com/v1/directions");
+  assert.equal(parsed.searchParams.get("origin"), "126.9706,37.5559");
+  assert.equal(parsed.searchParams.get("destination"), "127.0276,37.4979");
+  assert.equal(parsed.searchParams.get("priority"), "TIME");
+  assert.equal(parsed.searchParams.get("car_fuel"), "GASOLINE");
+  assert.equal(parsed.searchParams.get("alternatives"), "true");
+  assert.equal(calls[0].headers.authorization, "KakaoAK mob-key");
+});
+
+test("Kakao Mobility directions forwards whitelisted avoid options", async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), headers: options.headers });
+    return new Response(
+      JSON.stringify({
+        trans_id: "avoid",
+        routes: [{ result_code: 0, result_msg: "성공", summary: { distance: 1000, duration: 300 } }]
+      }),
+      { status: 200, headers: { "content-type": "application/json;charset=UTF-8" } }
+    );
+  };
+
+  const app = buildServer({ env: { KAKAO_REST_API_KEY: "mob-key" } });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-mobility/directions?origin=126.9706,37.5559&destination=127.0276,37.4979&avoid=toll%7Cmotorway"
+  });
+  assert.equal(response.statusCode, 200);
+  const parsed = new URL(calls[0].url);
+  assert.equal(parsed.searchParams.get("avoid"), "toll|motorway");
+});
+
+test("Kakao Mobility directions endpoint validates coordinate, priority, and waypoint count", async (t) => {
+  const app = buildServer({ env: { KAKAO_REST_API_KEY: "k" } });
+  t.after(async () => {
+    await app.close();
+  });
+
+  const missing = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-mobility/directions"
+  });
+  assert.equal(missing.statusCode, 400);
+
+  const badPriority = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-mobility/directions?origin=127.0,37.5&destination=127.1,37.6&priority=CHEAP"
+  });
+  assert.equal(badPriority.statusCode, 400);
+
+  const badAvoid = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-mobility/directions?origin=127.0,37.5&destination=127.1,37.6&avoid=unpaved"
+  });
+  assert.equal(badAvoid.statusCode, 400);
+
+  const tooManyWaypoints = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-mobility/directions?origin=127.0,37.5&destination=127.1,37.6&waypoints="
+      + encodeURIComponent("127.0,37.5|127.0,37.5|127.0,37.5|127.0,37.5|127.0,37.5|127.0,37.5")
+  });
+  assert.equal(tooManyWaypoints.statusCode, 400);
+});
+
+test("Kakao Mobility directions rejects out-of-range waypoints before upstream", async (t) => {
+  const originalFetch = global.fetch;
+  let upstreamCalls = 0;
+  global.fetch = async () => {
+    upstreamCalls += 1;
+    throw new Error("Unexpected upstream call for invalid waypoint.");
+  };
+
+  const app = buildServer({ env: { KAKAO_REST_API_KEY: "k" } });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/kakao-mobility/directions?origin=127.0,37.5&destination=127.1,37.6&waypoints=181,37.55"
+  });
+  assert.equal(response.statusCode, 400);
+  assert.match(response.json().message, /waypoint\[0\]/);
+  assert.equal(upstreamCalls, 0);
+});
+
+test("Kakao Mobility directions surfaces routes[0].result_code != 0 as 502 and does not cache", async (t) => {
+  const originalFetch = global.fetch;
+  let upstreamCalls = 0;
+  global.fetch = async () => {
+    upstreamCalls += 1;
+    return new Response(
+      JSON.stringify({
+        routes: [{ result_code: 104, result_msg: "출발지와 도착지가 너무 가깝습니다." }]
+      }),
+      { status: 200, headers: { "content-type": "application/json;charset=UTF-8" } }
+    );
+  };
+  const app = buildServer({ env: { KAKAO_REST_API_KEY: "k" } });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const url = "/v1/kakao-mobility/directions?origin=127.0,37.5&destination=127.0001,37.5001";
+  const first = await app.inject({ method: "GET", url });
+  assert.equal(first.statusCode, 502);
+  assert.equal(first.json().error, "upstream_semantic_error");
+
+  const second = await app.inject({ method: "GET", url });
+  assert.equal(second.statusCode, 502);
+  assert.equal(upstreamCalls, 2, "semantic failures must not be cached");
+});
+
+test("Kakao Map health endpoint reflects kakaoMapConfigured and kakaoMobilityConfigured", async (t) => {
+  const appOff = buildServer({ env: {} });
+  t.after(async () => {
+    await appOff.close();
+  });
+  const off = await appOff.inject({ method: "GET", url: "/health" });
+  assert.equal(off.json().upstreams.kakaoMapConfigured, false);
+  assert.equal(off.json().upstreams.kakaoMobilityConfigured, false);
+
+  const appOn = buildServer({ env: { KAKAO_REST_API_KEY: "k" } });
+  t.after(async () => {
+    await appOn.close();
+  });
+  const on = await appOn.inject({ method: "GET", url: "/health" });
+  assert.equal(on.json().upstreams.kakaoMapConfigured, true);
+  assert.equal(on.json().upstreams.kakaoMobilityConfigured, true);
+});
+
 test("Naver Map directions endpoint returns 503 when proxy lacks Naver Map keys", async (t) => {
   const originalFetch = global.fetch;
   global.fetch = async () => {
