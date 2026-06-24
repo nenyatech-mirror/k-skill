@@ -31,6 +31,7 @@ const ANALYSIS_TYPES = new Set(["basic", "fortune", "yongsin", "school_compare",
 const FORTUNE_TYPES = new Set(["general", "career", "wealth", "health", "love"]);
 const GENDERS = new Set(["male", "female"]);
 const CALENDARS = new Set(["solar", "lunar"]);
+const UNSUPPORTED_LUNAR_CONVERSION_MESSAGE = "lunar calendar conversion is not supported without a verified manse calendar table. Enter a solar/Gregorian birthDate or convert the lunar date before analysis.";
 
 const ELEMENT_KO = {
   wood: "목",
@@ -117,6 +118,7 @@ function analyzeSaju(birthInput, options = {}) {
   if (analysisType === "fortune" && !FORTUNE_TYPES.has(fortuneType)) {
     throw new Error("fortuneType must be general, career, wealth, health, or love.");
   }
+  rejectUnsupportedLunarInput(input);
 
   const dateParts = parseDate(input.birthDate);
   const timeParts = parseTime(input.birthTime);
@@ -492,14 +494,24 @@ function convertCalendar(args) {
     throw new Error("fromCalendar and toCalendar must be solar or lunar.");
   }
 
-  return {
-    originalDate: date,
-    originalCalendar: fromCalendar,
-    convertedDate: date,
-    convertedCalendar: toCalendar,
-    isLeapMonth: Boolean(args.isLeapMonth),
-    note: "saju-fortune 내장 변환은 서버 없는 사용을 위한 보수적 placeholder입니다. 정밀 음양력 변환은 upstream 만세력 테이블 기반 결과와 대조하세요."
-  };
+  if (fromCalendar === toCalendar) {
+    return {
+      originalDate: date,
+      originalCalendar: fromCalendar,
+      convertedDate: date,
+      convertedCalendar: toCalendar,
+      isLeapMonth: Boolean(args.isLeapMonth),
+      note: "동일한 달력 체계라 변환하지 않았습니다."
+    };
+  }
+
+  throw new Error(UNSUPPORTED_LUNAR_CONVERSION_MESSAGE);
+}
+
+function rejectUnsupportedLunarInput(input) {
+  if (input.calendar === "lunar") {
+    throw new Error(UNSUPPORTED_LUNAR_CONVERSION_MESSAGE);
+  }
 }
 
 function summarizePerson(result) {

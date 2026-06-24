@@ -32,7 +32,7 @@ function printHelp() {
 Options:
   --name NAME                 Korean name for the reading
   --hanja-name NAME           Optional Hanja name
-  --calendar solar|lunar      Birth calendar, defaults to solar
+  --calendar solar|lunar      Birth calendar, defaults to solar; lunar is rejected until pre-converted
   --leap-month                Mark lunar leap month
   --birth-city CITY           Birth city for reading context
   --analysis-type TYPE        basic|fortune|yongsin|school_compare|yongsin_method

@@ -49,6 +49,43 @@ test("normalizeBirthInput validates and preserves saju birth details", () => {
     /birthTime must be HH:mm/
   );
 });
+test("analyzeSaju rejects lunar dates until conversion is supported", () => {
+  assert.throws(
+    () => analyzeSaju({
+      birthDate: "1990-03-15",
+      birthTime: "10:30",
+      calendar: "lunar",
+      isLeapMonth: true,
+      gender: "male"
+    }),
+    /lunar calendar conversion is not supported/
+  );
+});
+
+test("convert_calendar rejects unsupported lunar and solar conversion", () => {
+  assert.throws(
+    () => callSajuTool("convert_calendar", {
+      date: "1990-03-15",
+      fromCalendar: "lunar",
+      toCalendar: "solar",
+      isLeapMonth: true
+    }),
+    /lunar calendar conversion is not supported/
+  );
+
+  assert.deepEqual(callSajuTool("convert_calendar", {
+    date: "1990-03-15",
+    fromCalendar: "solar",
+    toCalendar: "solar"
+  }), {
+    originalDate: "1990-03-15",
+    originalCalendar: "solar",
+    convertedDate: "1990-03-15",
+    convertedCalendar: "solar",
+    isLeapMonth: false,
+    note: "동일한 달력 체계라 변환하지 않았습니다."
+  });
+});
 
 test("analyzeSaju returns pillars, element balance, and topic guidance", () => {
   const result = analyzeSaju({

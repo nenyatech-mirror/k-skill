@@ -15,3 +15,5 @@ const result = analyzeSaju({
 ```
 
 The result is a reading aid, not a deterministic guarantee or professional advice.
+
+Lunar birth dates are not converted locally. Pass a solar/Gregorian `birthDate`, or pre-convert an 음력/윤달 date with a verified manse calendar before calling `analyzeSaju`.
