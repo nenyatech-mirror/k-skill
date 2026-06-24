@@ -314,12 +314,35 @@ test("level and context aliases accept Korean site labels", () => {
   assert.equal(normalizeContext("상가"), "shop")
 })
 
+test("CLI report rejects omitted device hash before submission", () => {
+  const cli = path.join(__dirname, "..", "src", "cli.js")
+  const result = spawnSync(process.execPath, [
+    cli,
+    "report",
+    "--gu-code",
+    "11070",
+    "--level",
+    "많아요",
+    "--context",
+    "길거리",
+    "--lng",
+    "127.09",
+    "--lat",
+    "37.59",
+    "--accuracy",
+    "25"
+  ], { encoding: "utf8" })
+
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /deviceHash is required for report submission/)
+})
 test("CLI prints search JSON and help", () => {
   const cli = path.join(__dirname, "..", "src", "cli.js")
   const help = spawnSync(process.execPath, [cli, "--help"], { encoding: "utf8" })
   assert.equal(help.status, 0)
   assert.match(help.stdout, /lovebug-report search/)
   assert.match(help.stdout, /lovebug-report report/)
+  assert.match(help.stdout, /Required stable anonymous device id/)
 })
 
 function jsonResponse(body, options = {}) {

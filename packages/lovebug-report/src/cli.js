@@ -76,7 +76,7 @@ Report options:
   --context <label>       실내, 길거리, 공원, 지하철·버스, 상가, 기타.
   --lng, --lat <number>   Current coordinates. lovebug.com rejects coordinates outside the gu.
   --accuracy <meters>     GPS accuracy in meters.
-  --device-hash <id>      Stable anonymous device id. Used for duplicate/rate limits.
+  --device-hash <id>      Required stable anonymous device id for duplicate/rate limits.
   --image-url <url>       Optional already-uploaded image URL.
 
 Lookup options:
