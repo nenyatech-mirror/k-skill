@@ -17,31 +17,10 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
-from popbill import (
-    AccountCheckService,
-    BizInfoCheckService,
-    Cashbill,
-    CashbillService,
-    ClosedownService,
-    EasyFinBankService,
-    FaxReceiver,
-    FaxService,
-    FileData,
-    HTCashbillService,
-    HTTaxinvoiceService,
-    KakaoButton,
-    KakaoReceiver,
-    KakaoService,
-    MessageReceiver,
-    MessageService,
-    PopbillException,
-    Statement,
-    StatementDetail,
-    StatementService,
-    Taxinvoice,
-    TaxinvoiceDetail,
-    TaxinvoiceService,
-)
+from popbill import PopbillException
+from popbill_registry import OBJECT_CLASSES, SERVICE_CLASSES
+from popbill_safety import is_dangerous_method
+from popbill_templates import object_templates
 
 SECRET_FILE = Path.home() / ".config" / "k-skill" / "secrets.env"
 ENV_ALIASES = {
@@ -51,42 +30,6 @@ ENV_ALIASES = {
     "user_id": ("KSKILL_POPBILL_USER_ID", "POPBILL_USER_ID"),
 }
 DEFAULT_TEST_CORP_NUMS = ("1231212312", "1248100998", "1208800767")
-
-SERVICE_CLASSES: dict[str, type] = {
-    "taxinvoice": TaxinvoiceService,
-    "statement": StatementService,
-    "cashbill": CashbillService,
-    "message": MessageService,
-    "kakao": KakaoService,
-    "fax": FaxService,
-    "closedown": ClosedownService,
-    "bizinfo": BizInfoCheckService,
-    "easyfin-bank": EasyFinBankService,
-    "account-check": AccountCheckService,
-    "ht-taxinvoice": HTTaxinvoiceService,
-    "ht-cashbill": HTCashbillService,
-}
-
-OBJECT_CLASSES: dict[str, type] = {
-    "taxinvoice": Taxinvoice,
-    "taxinvoice-detail": TaxinvoiceDetail,
-    "statement": Statement,
-    "statement-detail": StatementDetail,
-    "cashbill": Cashbill,
-    "message-receiver": MessageReceiver,
-    "fax-receiver": FaxReceiver,
-    "file-data": FileData,
-    "kakao-receiver": KakaoReceiver,
-    "kakao-button": KakaoButton,
-}
-
-# Methods that send, issue, mutate account state, upload files, request jobs, charge/refund, or expose one-time URLs.
-DANGEROUS_METHOD_PATTERNS = re.compile(
-    r"^(send|send[A-Z]|issue|regist|register|update|delete|cancel|deny|refuse|accept|request|bulk|attach|detach|assign|"
-    r"join|quit|refund|payment|close|revoke|FAXSend|checkAccountInfo|checkDepositorInfo)",
-)
-SAFE_URL_METHODS = {"getURL", "getPopbillURL", "getPaymentURL", "getUseHistoryURL", "getChargeURL", "getAccessURL"}
-
 
 def load_dotenv(path: Path = SECRET_FILE) -> None:
     if not path.exists():
@@ -178,10 +121,6 @@ def nested_object(value: Any) -> Any:
     return value
 
 
-def is_dangerous_method(method_name: str) -> bool:
-    return bool(DANGEROUS_METHOD_PATTERNS.search(method_name)) and method_name not in SAFE_URL_METHODS
-
-
 def guard_dangerous(method_name: str, args: argparse.Namespace) -> None:
     if not is_dangerous_method(method_name):
         return
@@ -226,36 +165,7 @@ def command_methods(args: argparse.Namespace) -> int:
 
 
 def command_object_template(args: argparse.Namespace) -> int:
-    templates = {
-        "taxinvoice": {
-            "issueType": "정발행",
-            "chargeDirection": "정과금",
-            "purposeType": "청구",
-            "taxType": "과세",
-            "writeDate": dt.date.today().strftime("%Y%m%d"),
-            "invoicerMgtKey": "TEST-YYYYMMDD-001",
-            "invoicerCorpNum": "1234567890",
-            "invoicerCorpName": "공급자 상호",
-            "invoicerCEOName": "대표자",
-            "invoicerAddr": "공급자 주소",
-            "invoicerEmail": "tax@example.com",
-            "invoiceeType": "사업자",
-            "invoiceeCorpNum": "0987654321",
-            "invoiceeCorpName": "공급받는자 상호",
-            "invoiceeCEOName": "대표자",
-            "invoiceeAddr": "공급받는자 주소",
-            "invoiceeEmail1": "receiver@example.com",
-            "supplyCostTotal": "91",
-            "taxTotal": "9",
-            "totalAmount": "100",
-            "detailList": [{"__kind__": "taxinvoice-detail", "serialNum": 1, "itemName": "테스트 품목", "supplyCost": "91", "tax": "9"}],
-        },
-        "statement": {"itemCode": 121, "mgtKey": "STMT-YYYYMMDD-001", "senderCorpNum": "1234567890", "receiverCorpNum": "0987654321", "detailList": [{"__kind__": "statement-detail", "serialNum": 1, "itemName": "테스트 품목", "supplyCost": "91", "tax": "9"}]},
-        "cashbill": {"mgtKey": "CASH-YYYYMMDD-001", "tradeType": "승인거래", "tradeUsage": "소득공제용", "taxationType": "과세", "totalAmount": "100", "supplyCost": "91", "tax": "9", "serviceFee": "0", "identityNum": "01000000000", "customerName": "테스트"},
-        "message-receiver": {"receiveNum": "01000000000", "receiveName": "테스트"},
-        "fax-receiver": {"receiveNum": "0200000000", "receiveName": "테스트"},
-        "kakao-receiver": {"rcv": "01000000000", "rcvnm": "테스트", "msg": "알림톡 테스트"},
-    }
+    templates = object_templates()
     print_json({"kind": args.kind, "template": templates.get(args.kind, {})})
     return 0
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 from fake_popbill import install_fake_popbill
@@ -8,6 +9,7 @@ from fake_popbill import install_fake_popbill
 install_fake_popbill()
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "popbill_cli.py"
+sys.path.insert(0, str(MODULE_PATH.parent))
 spec = importlib.util.spec_from_file_location("popbill_cli", MODULE_PATH)
 popbill_cli = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
@@ -21,8 +23,11 @@ def test_normalize_corp_num_accepts_hyphenated_number():
 def test_dangerous_methods_require_approval():
     assert popbill_cli.is_dangerous_method("registIssue") is True
     assert popbill_cli.is_dangerous_method("sendSMS") is True
+    assert popbill_cli.is_dangerous_method("CancelReserveRNbyRCV") is True
+    assert popbill_cli.is_dangerous_method("resendFax_multi") is True
     assert popbill_cli.is_dangerous_method("delete") is True
     assert popbill_cli.is_dangerous_method("getInfo") is False
+    assert popbill_cli.is_dangerous_method("getURL") is False
     assert popbill_cli.is_dangerous_method("getPartnerBalance") is False
 
 
