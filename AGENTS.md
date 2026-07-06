@@ -50,9 +50,7 @@ These rules are repo-specific and apply to everything under this directory.
 - 공개 문서에는 production host 이름, serving runtime, tunnel/reverse-proxy 구조, 서버 파일 경로, 배포 트리거, rollback 절차를 기록하지 않는다.
 - 운영자 전용 serving runbook은 repo 밖 private 위치에 보관하고, public PR/issue/comment에는 해당 내용을 붙이지 않는다.
 - public smoke test는 hosted base URL의 `/health`와 대표 read-only route까지만 언급한다. 내부 serving 경로는 공개하지 않는다.
-- proxy 서버 코드: `packages/k-skill-proxy/src/server.js`
-- 컨테이너 이미지 빌드 정의: `packages/k-skill-proxy/Dockerfile`
-- proxy 서버 테스트: `packages/k-skill-proxy/test/server.test.js`
-- 로컬 테스트: `node packages/k-skill-proxy/src/server.js` (환경변수는 `~/.config/k-skill/secrets.env` 등에서 직접 export해서 띄운다)
+- proxy 코드·빌드·테스트는 repo 내부 개발 파일에서 다루되, public 문서에 운영 serving 경로·시크릿 경로·배포 구조를 추가하지 않는다.
+- 로컬 검증은 개발자 개인 환경에서 수행하고, public 문서에는 운영 경로·서버 경로·시크릿 위치를 남기지 않는다.
 - 프로덕션 시크릿은 repo/GitHub Actions/public docs에 저장하지 않는다. 런타임·터널·프로세스 권한은 production secret 접근 권한과 동일하게 취급한다.
 - proxy 운영 관련 질문이 들어오면 public repo 문서가 아니라 maintainer의 private runbook을 확인한다.

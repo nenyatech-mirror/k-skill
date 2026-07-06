@@ -85,7 +85,7 @@
 node packages/k-skill-proxy/src/server.js
 ```
 
-환경변수(`AIR_KOREA_OPEN_API_KEY` 등)가 이미 설정되어 있거나 `~/.config/k-skill/secrets.env`를 source한 상태에서 실행한다.
+환경변수(`AIR_KOREA_OPEN_API_KEY` 등)가 이미 설정되어 있거나 개인 dotenv 파일을 source한 상태에서 실행한다.
 
 로컬 호출 예시는 `LOCAL_PROXY_BASE_URL`에 실행 중인 로컬 프록시 URL을 넣은 상태를 기준으로 한다.
 
