@@ -1,5 +1,11 @@
 const crypto = require("node:crypto");
 const Fastify = require("fastify");
+const {
+  normalizeAssemblyBillDetailQuery,
+  normalizeAssemblyBillSearchQuery,
+  normalizeAssemblyVoteQuery,
+  proxyAssemblyRequest
+} = require("./assembly");
 const { fetchFineDustReport } = require("./airkorea");
 const { fetchWaterLevelReport } = require("./hrfco");
 const { KRX_MARKETS, fetchBaseInfo, fetchTradeInfo, getCurrentKstDate, searchStocks } = require("./krx-stock");
@@ -57,6 +63,8 @@ const {
   proxyNhisCheckupRequest,
   proxyNhisLongTermCareRequest
 } = require("./nhis-care");
+const { normalizeKopisDetailQuery, normalizeKopisListQuery, proxyKopisRequest } = require("./kopis");
+const { normalizeKrWhoisDomainQuery, proxyKrWhoisDomainRequest } = require("./kr-whois");
 const AIR_KOREA_UPSTREAM_BASE_URL = "http://apis.data.go.kr";
 const DATA_GO_KR_UPSTREAM_BASE_URL = "https://apis.data.go.kr";
 const DATA4LIBRARY_UPSTREAM_BASE_URL = "https://data4library.kr/api";
@@ -186,6 +194,7 @@ function buildConfig(env = process.env) {
     port: parseInteger(env.KSKILL_PROXY_PORT, 4020),
     proxyName: env.KSKILL_PROXY_NAME || "k-skill-proxy",
     airKoreaApiKey: trimOrNull(env.AIR_KOREA_OPEN_API_KEY),
+    assemblyApiKey: trimOrNull(env.ASSEMBLY_API_KEY ?? env.KSKILL_ASSEMBLY_API_KEY),
     kmaOpenApiKey: trimOrNull(env.KMA_OPEN_API_KEY),
     seoulOpenApiKey: trimOrNull(env.SEOUL_OPEN_API_KEY),
     hrfcoApiKey: trimOrNull(env.HRFCO_OPEN_API_KEY),
@@ -196,6 +205,7 @@ function buildConfig(env = process.env) {
     kakaoRestApiKey: trimOrNull(env.KAKAO_REST_API_KEY),
     keduInfoKey: trimOrNull(env.KEDU_INFO_KEY),
     krxApiKey: trimOrNull(env.KRX_API_KEY),
+    kopisApiKey: trimOrNull(env.KOPIS_API_KEY ?? env.KSKILL_KOPIS_API_KEY),
     kosisApiKey: trimOrNull(env.KOSIS_API_KEY ?? env.KSKILL_KOSIS_API_KEY),
     naverSearchClientId: trimOrNull(env.NAVER_SEARCH_CLIENT_ID ?? env.NAVER_CLIENT_ID),
     naverSearchClientSecret: trimOrNull(env.NAVER_SEARCH_CLIENT_SECRET ?? env.NAVER_CLIENT_SECRET),
@@ -1888,6 +1898,7 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
       port: config.port,
       upstreams: {
         airKoreaConfigured: Boolean(config.airKoreaApiKey),
+        assemblyConfigured: Boolean(config.assemblyApiKey),
         kmaOpenApiConfigured: Boolean(config.kmaOpenApiKey),
         seoulOpenApiConfigured: Boolean(config.seoulOpenApiKey),
         hrfcoConfigured: Boolean(config.hrfcoApiKey),
@@ -1898,6 +1909,7 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
         foodsafetyKoreaConfigured: Boolean(config.foodsafetyKoreaApiKey),
         neisSchoolMealConfigured: Boolean(config.keduInfoKey),
         krxConfigured: Boolean(config.krxApiKey),
+        kopisConfigured: Boolean(config.kopisApiKey),
         kakaoLocalConfigured: Boolean(config.kakaoRestApiKey),
         kakaoMapConfigured: Boolean(config.kakaoRestApiKey),
         kakaoMobilityConfigured: Boolean(config.kakaoRestApiKey),
@@ -1997,6 +2009,64 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
     cache.set(cacheKey, payload, config.cacheTtlMs);
     return payload;
   });
+
+  async function handleAssemblyRoute({ operation, normalize, cacheRoute, request, reply }) {
+    let normalized;
+
+    try {
+      normalized = normalize(request.query || {});
+    } catch (error) {
+      reply.code(400);
+      return {
+        error: "bad_request",
+        message: error.message
+      };
+    }
+
+    const cacheKey = makeCacheKey({ route: cacheRoute, ...normalized });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      reply.code(cached.statusCode);
+      reply.header("content-type", cached.contentType);
+      return cached.body;
+    }
+
+    const upstream = await proxyAssemblyRequest({
+      operation,
+      params: normalized,
+      apiKey: config.assemblyApiKey
+    });
+    if (upstream.statusCode >= 200 && upstream.statusCode < 300) {
+      cache.set(cacheKey, upstream, config.cacheTtlMs);
+    }
+    reply.code(upstream.statusCode);
+    reply.header("content-type", upstream.contentType);
+    return upstream.body;
+  }
+
+  app.get("/v1/assembly/bills", async (request, reply) => handleAssemblyRoute({
+    operation: "ALLBILLV2",
+    normalize: normalizeAssemblyBillSearchQuery,
+    cacheRoute: "assembly-bills",
+    request,
+    reply
+  }));
+
+  app.get("/v1/assembly/bill-detail", async (request, reply) => handleAssemblyRoute({
+    operation: "BILLINFODETAIL",
+    normalize: normalizeAssemblyBillDetailQuery,
+    cacheRoute: "assembly-bill-detail",
+    request,
+    reply
+  }));
+
+  app.get("/v1/assembly/votes", async (request, reply) => handleAssemblyRoute({
+    operation: "nojepdqqaweusdfbi",
+    normalize: normalizeAssemblyVoteQuery,
+    cacheRoute: "assembly-votes",
+    request,
+    reply
+  }));
 
   app.get("/v1/seoul-bike/realtime", async (request, reply) => {
     let normalized;
@@ -2493,6 +2563,119 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
     }
 
     return payload;
+  });
+
+  async function handleKopisListRoute({ operation, path, request, reply }) {
+    let normalized;
+
+    try {
+      normalized = normalizeKopisListQuery(request.query || {}, operation);
+    } catch (error) {
+      reply.code(400);
+      return {
+        error: "bad_request",
+        message: error.message
+      };
+    }
+
+    const cacheKey = makeCacheKey({ route: `kopis-${operation}`, ...normalized });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      reply.code(cached.statusCode);
+      reply.header("content-type", cached.contentType);
+      return cached.body;
+    }
+
+    const upstream = await proxyKopisRequest({ path, params: normalized, serviceKey: config.kopisApiKey });
+    if (upstream.statusCode >= 200 && upstream.statusCode < 300) {
+      cache.set(cacheKey, upstream, config.cacheTtlMs);
+    }
+    reply.code(upstream.statusCode);
+    reply.header("content-type", upstream.contentType);
+    return upstream.body;
+  }
+
+  app.get("/v1/kopis/performances", async (request, reply) => handleKopisListRoute({
+    operation: "performances",
+    path: "pblprfr",
+    request,
+    reply
+  }));
+
+  app.get("/v1/kopis/facilities", async (request, reply) => handleKopisListRoute({
+    operation: "facilities",
+    path: "prfplc",
+    request,
+    reply
+  }));
+
+  app.get("/v1/kopis/performances/:id", async (request, reply) => {
+    let normalized;
+    try {
+      normalized = normalizeKopisDetailQuery(request.params || {}, "performance id");
+    } catch (error) {
+      reply.code(400);
+      return { error: "bad_request", message: error.message };
+    }
+    const upstream = await proxyKopisRequest({
+      path: `pblprfr/${encodeURIComponent(normalized.id)}`,
+      serviceKey: config.kopisApiKey
+    });
+    reply.code(upstream.statusCode);
+    reply.header("content-type", upstream.contentType);
+    return upstream.body;
+  });
+
+  app.get("/v1/kopis/facilities/:id", async (request, reply) => {
+    let normalized;
+    try {
+      normalized = normalizeKopisDetailQuery(request.params || {}, "facility id");
+    } catch (error) {
+      reply.code(400);
+      return { error: "bad_request", message: error.message };
+    }
+    const upstream = await proxyKopisRequest({
+      path: `prfplc/${encodeURIComponent(normalized.id)}`,
+      serviceKey: config.kopisApiKey
+    });
+    reply.code(upstream.statusCode);
+    reply.header("content-type", upstream.contentType);
+    return upstream.body;
+  });
+
+  app.get("/v1/kr-whois/domain", async (request, reply) => {
+    let normalized;
+
+    try {
+      normalized = normalizeKrWhoisDomainQuery(request.query || {});
+    } catch (error) {
+      reply.code(400);
+      return {
+        error: "bad_request",
+        message: error.message
+      };
+    }
+
+    const cacheKey = makeCacheKey({ route: "kr-whois-domain", ...normalized });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      reply.code(cached.statusCode);
+      reply.header("content-type", cached.contentType);
+      return cached.body;
+    }
+
+    const upstream = await proxyKrWhoisDomainRequest({
+      params: normalized,
+      serviceKey: config.molitApiKey
+    });
+
+    if (upstream.statusCode >= 200 && upstream.statusCode < 300) {
+      cache.set(cacheKey, upstream, config.cacheTtlMs);
+    }
+
+    reply.code(upstream.statusCode);
+    reply.header("content-type", upstream.contentType);
+    return upstream.body;
   });
 
   app.get("/v1/nhis/long-term-care", async (request, reply) => {
@@ -5156,6 +5339,9 @@ module.exports = {
   createMemoryCache,
   isFailureResponse,
   makeCacheKey,
+  normalizeAssemblyBillDetailQuery,
+  normalizeAssemblyBillSearchQuery,
+  normalizeAssemblyVoteQuery,
   normalizeData4LibraryBookDetailQuery,
   normalizeData4LibraryBookExistsQuery,
   normalizeData4LibraryBookSearchQuery,
@@ -5172,7 +5358,10 @@ module.exports = {
   normalizeKosisDataQuery,
   normalizeKosisMetaQuery,
   normalizeKosisSearchQuery,
+  normalizeKopisDetailQuery,
+  normalizeKopisListQuery,
   normalizeKstartupQuery,
+  normalizeKrWhoisDomainQuery,
   normalizeNhisCheckupQuery,
   normalizeNhisLongTermCareQuery,
   normalizeKoreanStockLookupQuery,
@@ -5194,6 +5383,7 @@ module.exports = {
   normalizeSeoulCityDataQuery,
   normalizeSeoulSubwayQuery,
   proxyAirKoreaRequest,
+  proxyAssemblyRequest,
   proxyData4LibraryRequest,
   proxyHrfcoWaterLevelRequest,
   proxyKakaoLocalRequest,
@@ -5201,6 +5391,8 @@ module.exports = {
   proxyNeisSchoolInfoRequest,
   proxyKmaWeatherRequest,
   proxyKosisRequest,
+  proxyKopisRequest,
+  proxyKrWhoisDomainRequest,
   proxyKstartupRequest,
   proxyNhisCheckupRequest,
   proxyNhisLongTermCareRequest,
