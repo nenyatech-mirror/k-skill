@@ -18,6 +18,7 @@ const {
   normalizeKstartupQuery,
   normalizeNtsBusinessStatusQuery,
   normalizeNtsBusinessValidateQuery,
+  normalizeNhisLongTermCareQuery,
   proxyAirKoreaRequest,
   proxyData4LibraryRequest,
   proxyHrfcoWaterLevelRequest,
@@ -78,6 +79,88 @@ test("createMemoryCache refuses to store failure responses", () => {
 
   assert.equal(cache.set("k4", { items: [{ id: 1 }] }, 60000), true);
   assert.deepEqual(cache.get("k4"), { items: [{ id: 1 }] }, "successful payload must be stored");
+});
+
+test("NHIS long-term care normalizer validates bounded search params", () => {
+  assert.deepEqual(
+    normalizeNhisLongTermCareQuery({
+      q: "강남",
+      sido: "11",
+      sigungu: "11680",
+      service_kind: "1",
+      page: "2",
+      limit: "20"
+    }),
+    {
+      adminNm: "강남",
+      siDoCd: "11",
+      siGunGuCd: "11680",
+      serviceKind: "1",
+      pageNo: 2,
+      numOfRows: 20
+    }
+  );
+
+  assert.throws(() => normalizeNhisLongTermCareQuery({}), /adminNm/);
+  assert.throws(() => normalizeNhisLongTermCareQuery({ sido: "서울" }), /siDoCd/);
+  assert.throws(() => normalizeNhisLongTermCareQuery({ q: "강남", limit: "101" }), /numOfRows/);
+});
+
+test("NHIS long-term care route injects serviceKey and caches XML success", async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    return new Response(
+      "<response><header><resultCode>00</resultCode><resultMsg>OK</resultMsg></header><body><items><item><adminNm>강남요양원</adminNm></item></items></body></response>",
+      { status: 200, headers: { "content-type": "application/xml;charset=UTF-8" } }
+    );
+  };
+
+  const app = buildServer({ env: { DATA_GO_KR_API_KEY: "data-go-key" } });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const first = await app.inject({ method: "GET", url: "/v1/nhis/long-term-care?q=%EA%B0%95%EB%82%A8&sido=11&limit=5" });
+  assert.equal(first.statusCode, 200);
+  assert.match(first.body, /강남요양원/);
+  assert.match(calls[0], /getBillGreentInsttSearchList02/);
+  assert.match(calls[0], /serviceKey=data-go-key/);
+  assert.match(calls[0], /adminNm=%EA%B0%95%EB%82%A8/);
+  assert.match(calls[0], /siDoCd=11/);
+  assert.match(calls[0], /numOfRows=5/);
+
+  const second = await app.inject({ method: "GET", url: "/v1/nhis/long-term-care?q=%EA%B0%95%EB%82%A8&sido=11&limit=5" });
+  assert.equal(second.statusCode, 200);
+  assert.equal(calls.length, 1, "second request must be served from cache");
+});
+
+test("NHIS long-term care route reports missing and rejected upstream key", async (t) => {
+  const app = buildServer({ env: {} });
+  t.after(async () => {
+    await app.close();
+  });
+
+  const missing = await app.inject({ method: "GET", url: "/v1/nhis/long-term-care?q=%EA%B0%95%EB%82%A8" });
+  assert.equal(missing.statusCode, 503);
+  assert.equal(missing.json().error, "upstream_not_configured");
+
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Response(
+    "<OpenAPI_ServiceResponse><cmmMsgHeader><returnAuthMsg>SERVICE KEY IS NOT REGISTERED ERROR</returnAuthMsg></cmmMsgHeader></OpenAPI_ServiceResponse>",
+    { status: 200, headers: { "content-type": "application/xml" } }
+  );
+  const rejectedApp = buildServer({ env: { DATA_GO_KR_API_KEY: "bad-key" } });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await rejectedApp.close();
+  });
+
+  const rejected = await rejectedApp.inject({ method: "GET", url: "/v1/nhis/long-term-care?q=%EA%B0%95%EB%82%A8" });
+  assert.equal(rejected.statusCode, 502);
+  assert.equal(rejected.json().error, "upstream_forbidden");
 });
 
 test("food-safety search does not cache upstream failures so transient errors self-heal", async (t) => {
