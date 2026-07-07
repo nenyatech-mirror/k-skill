@@ -1,5 +1,11 @@
 const crypto = require("node:crypto");
 const Fastify = require("fastify");
+const {
+  normalizeAssemblyBillDetailQuery,
+  normalizeAssemblyBillSearchQuery,
+  normalizeAssemblyVoteQuery,
+  proxyAssemblyRequest
+} = require("./assembly");
 const { fetchFineDustReport } = require("./airkorea");
 const { fetchWaterLevelReport } = require("./hrfco");
 const { KRX_MARKETS, fetchBaseInfo, fetchTradeInfo, getCurrentKstDate, searchStocks } = require("./krx-stock");
@@ -180,6 +186,7 @@ function buildConfig(env = process.env) {
     port: parseInteger(env.KSKILL_PROXY_PORT, 4020),
     proxyName: env.KSKILL_PROXY_NAME || "k-skill-proxy",
     airKoreaApiKey: trimOrNull(env.AIR_KOREA_OPEN_API_KEY),
+    assemblyApiKey: trimOrNull(env.ASSEMBLY_API_KEY ?? env.KSKILL_ASSEMBLY_API_KEY),
     kmaOpenApiKey: trimOrNull(env.KMA_OPEN_API_KEY),
     seoulOpenApiKey: trimOrNull(env.SEOUL_OPEN_API_KEY),
     hrfcoApiKey: trimOrNull(env.HRFCO_OPEN_API_KEY),
@@ -1882,6 +1889,7 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
       port: config.port,
       upstreams: {
         airKoreaConfigured: Boolean(config.airKoreaApiKey),
+        assemblyConfigured: Boolean(config.assemblyApiKey),
         kmaOpenApiConfigured: Boolean(config.kmaOpenApiKey),
         seoulOpenApiConfigured: Boolean(config.seoulOpenApiKey),
         hrfcoConfigured: Boolean(config.hrfcoApiKey),
@@ -1989,6 +1997,64 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
     cache.set(cacheKey, payload, config.cacheTtlMs);
     return payload;
   });
+
+  async function handleAssemblyRoute({ operation, normalize, cacheRoute, request, reply }) {
+    let normalized;
+
+    try {
+      normalized = normalize(request.query || {});
+    } catch (error) {
+      reply.code(400);
+      return {
+        error: "bad_request",
+        message: error.message
+      };
+    }
+
+    const cacheKey = makeCacheKey({ route: cacheRoute, ...normalized });
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      reply.code(cached.statusCode);
+      reply.header("content-type", cached.contentType);
+      return cached.body;
+    }
+
+    const upstream = await proxyAssemblyRequest({
+      operation,
+      params: normalized,
+      apiKey: config.assemblyApiKey
+    });
+    if (upstream.statusCode >= 200 && upstream.statusCode < 300) {
+      cache.set(cacheKey, upstream, config.cacheTtlMs);
+    }
+    reply.code(upstream.statusCode);
+    reply.header("content-type", upstream.contentType);
+    return upstream.body;
+  }
+
+  app.get("/v1/assembly/bills", async (request, reply) => handleAssemblyRoute({
+    operation: "ALLBILLV2",
+    normalize: normalizeAssemblyBillSearchQuery,
+    cacheRoute: "assembly-bills",
+    request,
+    reply
+  }));
+
+  app.get("/v1/assembly/bill-detail", async (request, reply) => handleAssemblyRoute({
+    operation: "BILLINFODETAIL",
+    normalize: normalizeAssemblyBillDetailQuery,
+    cacheRoute: "assembly-bill-detail",
+    request,
+    reply
+  }));
+
+  app.get("/v1/assembly/votes", async (request, reply) => handleAssemblyRoute({
+    operation: "nojepdqqaweusdfbi",
+    normalize: normalizeAssemblyVoteQuery,
+    cacheRoute: "assembly-votes",
+    request,
+    reply
+  }));
 
   app.get("/v1/seoul-bike/realtime", async (request, reply) => {
     let normalized;
@@ -5078,6 +5144,9 @@ module.exports = {
   createMemoryCache,
   isFailureResponse,
   makeCacheKey,
+  normalizeAssemblyBillDetailQuery,
+  normalizeAssemblyBillSearchQuery,
+  normalizeAssemblyVoteQuery,
   normalizeData4LibraryBookDetailQuery,
   normalizeData4LibraryBookExistsQuery,
   normalizeData4LibraryBookSearchQuery,
@@ -5114,6 +5183,7 @@ module.exports = {
   normalizeSeoulCityDataQuery,
   normalizeSeoulSubwayQuery,
   proxyAirKoreaRequest,
+  proxyAssemblyRequest,
   proxyData4LibraryRequest,
   proxyHrfcoWaterLevelRequest,
   proxyKakaoLocalRequest,
