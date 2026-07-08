@@ -18,6 +18,13 @@
 - KBL 일정/결과 API: https://api.kbl.or.kr/match/list
 - KBL 팀 순위 API: https://api.kbl.or.kr/league/rank/team
 - 중앙선거관리위원회 공무국외출장보고서 게시판: https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107 — 인증 불필요, 서버 렌더 HTML 게시글 + 첨부 PDF/HWP/HWPX 등 제공, read-only 직접 조회. 상세는 `/site/nec/ex/bbs/View.do?cbIdx=1107&bcIdx=<게시글ID>`, 첨부는 `/common/board/Download.do?bcIdx=<게시글ID>&cbIdx=1107&streFileNm=<서버파일명>` 패턴을 사용한다. 2026-07-08 실측에서 목록 62건의 첨부가 모두 PDF였고, `bcIdx=303199` PDF 첨부는 `kordoc` JSON 추출에 성공했다. 원본 파일은 레포에 저장하지 않고, 요청 간 지연과 세션 호출 수 제한으로 과도한 요청을 피한다.
+- 인사혁신처 공무국외출장 안내: https://www.mpm.go.kr/mpm/info/infoService/BizService08/ — 심사기준으로 출장의 필요성, 방문국과 방문기관의 타당성, 출장자의 적합성, 출장시기의 적시성, 출장경비의 적정성을 제시한다. 보고서는 귀국 후 30일 이내 제출하고, 소속장관은 제출받은 날부터 15일 이내 국외출장연수정보시스템에 등록해야 한다고 안내한다.
+- 공무원 여비 규정: https://www.law.go.kr/lsInfoP.do?lsiSeq=282471 — 국외 항공운임은 제12조 및 별표 3 기준을 참고한다. 비용 대비 타당성 검토 신호는 최종 위법·낭비 판정이 아니라 원문과 공식 기준 대조가 필요한 항목을 표시하는 용도로만 사용한다.
+- 공무원 여비 규정 별표 3 국외 항공운임 지급 기준표: https://www.law.go.kr/LSW/flDownload.do?bylClsCd=110201&flSeq=160162321&gubun= — 별표 1 제1호 공무원은 실비(1등석), 별표 1 제2호 공무원은 실비(2등석) 기준으로 안내된다.
+- 인사혁신처 여비 FAQ: https://www.mpm.go.kr/mpm/info/hrFAQ/?boardId=bbs_0000000000000125&category=cat3&mode=list — 여비 지급구분표 제2호의 이코노미 탑승 대상자는 이코노미 컴포트·프리미엄 이코노미 등 추가 비용이 소요되는 좌석을 이용할 수 없다고 안내한다.
+- 행정안전부/정책브리핑 지방의회의원 외유성 출장 방지 사전·사후관리 강화: https://www.korea.kr/news/policyNewsView.do?newsId=148938493 — 출장계획서 사전공개, 방문기관·직원명단·비용 통합 심사, 사후 적법·적정성 심의, 심사결과서 공개, 예산 지출 제한, 1일 1기관 방문 권고, 수행인원 최소화 등을 비용 대비 타당성 검토 신호의 참고 기준으로 사용한다.
+- 행정안전부 지방의회 임기 만료 전 단순 외유성 출장 방지 보도자료: https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000008&nttId=122031 — 단순 외유성 공무국외출장 방지와 규칙 표준 개정 권고를 참고한다.
+- 국민권익위원회 지방의회 국외출장 실태 보도자료: https://www.acrc.go.kr/board.es?act=view&bid=4A&list_no=83269&mid=a10402010000 — 항공료 조작, 외유성 논란 등 비용 대비 타당성 검토 신호 설계의 참고 사례로 사용한다.
 - tossinvest-cli: https://github.com/JungHoonGhae/tossinvest-cli
 - 토스증권 공식 Open API 문서: https://developers.tossinvest.com/docs
 - 토스증권 공식 Open API OpenAPI JSON (source of truth): https://openapi.tossinvest.com/openapi-docs/latest/openapi.json
