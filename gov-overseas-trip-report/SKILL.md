@@ -1,6 +1,6 @@
 ---
 name: gov-overseas-trip-report
-description: 중앙선거관리위원회 공식 공무국외출장보고서 게시판을 조회해 보고서 목록, 상세 URL, 첨부 원문 URL, 문서에서 확인 가능한 출장 정보, 비용 대비 타당성 검토 신호, 감사·점검 사례 기반 레드플래그 개수를 참고용으로 구조화한다.
+description: 중앙선거관리위원회 공식 공무국외출장보고서 게시판을 조회해 보고서 목록, 상세 URL, 첨부 원문 URL, 문서에서 확인 가능한 출장 정보, 공개·미공개 항목, 산술 지표, 원문 인용 기반 검토 신호를 참고용으로 구조화한다.
 license: MIT
 metadata:
   category: civic
@@ -12,7 +12,7 @@ metadata:
 
 ## What this skill does
 
-중앙선거관리위원회 공식 홈페이지의 공무국외출장보고서 게시판을 read-only로 조회하고, 게시글 제목·등록일·상세 URL·첨부 원문 URL을 확인한다. 첨부가 PDF/HWP/HWPX이면 기존 `hwp` 스킬의 `kordoc` 절차로 텍스트 추출을 시도하고, 문서에서 확인되는 범위만 구조화한다. 문서에 비용, 항공권, 좌석등급, 숙박비, 일비 정보가 있으면 세금낭비 판정이 아니라 `비용 대비 타당성 검토 신호`로 별도 표시한다. 권익위·행안부 점검과 관리강화 자료에서 반복된 문서상 패턴은 `observedRedFlagCount`로 세되, 이는 위험도 점수나 낭비 판정이 아니라 관측된 검토 항목 수다.
+중앙선거관리위원회 공식 홈페이지의 공무국외출장보고서 게시판을 read-only로 조회하고, 게시글 제목·등록일·상세 URL·첨부 원문 URL을 확인한다. 첨부가 PDF/HWP/HWPX이면 기존 `hwp` 스킬의 `kordoc` 절차로 텍스트 추출을 시도하고, 문서에서 확인되는 범위만 구조화한다. 문서에 비용, 항공권, 좌석등급, 숙박비, 일비 정보가 있으면 세금낭비 판정이 아니라 사실, 산술, 미기재, 원문 인용 기반 검토 신호로 분리해 표시한다.
 
 이 스킬은 참고용 요약 도구다. 문서에 없는 정보는 추정하지 않고 `문서에서 확인 불가` 또는 `기재되어 있지 않음`으로 표시한다. 중요한 판단은 반드시 공식 원문을 직접 확인해야 한다.
 
@@ -31,7 +31,7 @@ metadata:
 허용된 공식 표면만 사용한다.
 
 - 목록: `https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107`
-- 페이지 이동: 같은 목록 경로에 `pageIndex=<number>`를 POST
+- 페이지 이동: 같은 목록 경로에 `pageIndex=<number>`를 POST. 예: `curl -X POST 'https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107' --data 'pageIndex=2&bcIdx=&mode='`
 - 상세: `https://www.nec.go.kr/site/nec/ex/bbs/View.do?cbIdx=1107&bcIdx=<게시글ID>`
 - 첨부 다운로드: `https://www.nec.go.kr/common/board/Download.do?bcIdx=<게시글ID>&cbIdx=1107&streFileNm=<서버파일명>`
 
@@ -63,48 +63,84 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
 ```
 
 8. `kordoc` 결과에서 제목, 국가, 기간, 목적, 일정, 출장자, 요약을 문서 근거가 있는 범위에서만 구조화한다.
-9. 비용과 출장 타당성 관련 텍스트가 있으면 `비용 대비 타당성 검토`와 `감사 사례 레드플래그`를 생성한다. 원문에 있는 목적, 방문기관, 일정, 출장자 역할, 비용, 좌석등급, 숙박비, 일비, 결과 활용계획만 사용하고, 시장가나 항공권 현재가를 임의로 조회하지 않는다.
+9. 비용·일정 관련 텍스트가 있으면 `arithmetic`, `disclosure`, `reviewSignals`, `recommendedDisclosureRequests`, `safeStatements`를 생성한다. 원문에 있는 목적, 방문기관, 일정, 출장자 역할, 비용, 좌석등급, 숙박비, 일비, 결과 활용계획만 사용하고, 시장가나 항공권 현재가를 임의로 조회하지 않는다.
 10. `success: false`, 빈 Markdown, 낮은 페이지 품질, 이미지 기반 스캔 PDF 등으로 추출할 수 없으면 실패 모드를 보고하고 원문 URL과 수동 확인 절차를 안내한다. 사용자가 명시적으로 요청하지 않는 한 OCR 모델 다운로드나 별도 OCR 파이프라인은 실행하지 않는다.
 11. 추출할 수 없거나 문서에 없는 정보는 추정하지 않고 `문서에서 확인 불가` 또는 `기재되어 있지 않음`으로 표시한다.
 12. 작업 후 임시 다운로드 파일을 삭제한다.
 13. 결과에는 항상 공식 게시글 URL과 첨부 원문 URL을 포함한다.
 
-## Value-for-money review signals
+## Transparency screening
 
-비용 대비 타당성 신호는 눈에 띄게 표시하되 `세금낭비`, `위법`, `부적정 집행`으로 단정하지 않는다. 결론은 `판단 유보`, `낭비 의심 신호 낮음`, `추가 검토 필요`, `낭비 의심 신호 높음` 중 하나로 두고, 반드시 요소별 근거를 함께 적는다.
+이 스킬은 위험도 점수나 낭비 여부 등급 같은 종합 판정 필드를 만들지 않는다. 결과는 확실성이 높은 순서대로 `facts`, `arithmetic`, `disclosure`, `reviewSignals` 네 층으로 분리한다.
 
-감사 사례 레드플래그는 과거 권익위 실태점검, 행안부 사전·사후관리 강화 기준, 공무국외출장 심사기준에서 반복된 문서상 패턴과 비교한다. `observedRedFlagCount`는 일치한 `id` 개수이며 점수, 등급, 랭킹, 세금낭비 판정이 아니다. 같은 유형의 근거가 여러 개여도 같은 `id`는 1회만 세고, 원문에 근거가 없으면 세지 않는다. 휴양지·해변·리조트 같은 단어가 국가 개황이나 선거운동 맥락 설명에만 나오면 레드플래그로 세지 말고 `contextFlags`에 `맥락 확인 필요`로 분리한다.
+### Facts
 
-요소별 신호:
+원문에서 직접 확인한 제목, 기관, 국가, 기간, 출장자, 목적, 일정, 게시일, 상세 URL, 첨부 URL만 기록한다. 원문에 없는 값은 추정하지 않는다.
 
-- `목적·필요성`: 목적이 구체적이고 기관 업무와 직접 연결되면 해소 신호다. 단순 `시찰`, `견학`, `자료수집`만 반복되고 결과 활용이 비어 있으면 의심 신호다.
-- `방문국·방문기관 적합성`: 목적과 방문국·방문기관이 직접 연결되고 공식 면담자/기관명이 있으면 해소 신호다. 목적과 무관한 국가·기관이 많거나 관광지 위주면 의심 신호다.
-- `출장자·인원 적정성`: 출장자별 역할과 담당업무가 있으면 해소 신호다. 인원이 많고 개인별 임무가 없거나 수행인원이 과도해 보이면 의심 신호다.
-- `기간·시기 적정성`: 공무 수행에 필요한 일정이 중심이고 출장기간이 과도하지 않으면 해소 신호다. 휴일·관광·이동이 업무일보다 크거나 성수기·방학·임기말 등 특별 점검이 필요한 시기면 추가 검토 신호다.
-- `일정 밀도`: 1일 1기관 이상 또는 이에 준하는 업무 일정이 확인되면 해소 신호다. 기관 방문 없이 자유일정, 관광, 이동만 반복되면 의심 신호다.
-- `비용 구조`: 예산, 실제 집행액, 산출내역, 항공권, 숙박비가 공개되면 해소 신호다. 비용이 없으면 `비용 정보 미공개`, 총액만 있으면 `추가 자료 필요`로 표시한다. 총액과 출장자 수가 모두 원문에서 확인되면 단순 산술 1인당 비용을 함께 표시할 수 있다.
-- `고비용 요소`: `비즈니스석`, `Business Class`, `중간석`, `1등석`, `First Class`, `프리미엄 이코노미`, `이코노미 컴포트`, 고액 숙박비, 차량임차·통역비 과다 표현이 있으면 `고비용 요소 확인`으로 표시한다.
-- `규정 대조`: 출장자 직급과 좌석등급이 함께 확인되면 `공무원 여비 규정` 제12조와 별표 3, 인사혁신처 여비 FAQ 기준으로 대조가 필요한지 표시한다. 허용 여부를 확정하지 말고 `규정 대조 필요`로 둔다.
-- `결과물·활용`: 면담 결과, 수집자료, 정책 반영 계획, 법령·제도 개선 활용방안이 있으면 해소 신호다. 결과가 의례적 문장뿐이거나 계획 대비 수행 여부를 알 수 없으면 추가 검토 신호다.
-- `사전·사후 투명성`: 계획서, 심사자료, 비용 정보, 결과보고서, 사후 심의 여부가 공개되면 해소 신호다. 결과보고서만 있고 계획서·비용·심사자료가 없으면 추가 검토 신호다.
-- `외부부담·이해관계`: 소속기관 외 기관·단체·개인이 비용을 부담하거나 이해관계자와 동행한 정황이 있으면 공정성 검토 신호다.
+### Arithmetic
 
-감사 사례 레드플래그 패턴:
+원문에서 필요한 값이 모두 확인될 때만 산술 필드를 채운다.
 
-- `cost_missing_or_total_only`: 예산·실제 집행액·산출내역이 없거나 총액만 있고 항공·숙박·일비·차량·통역 등 세부 항목이 없다.
-- `high_cost_or_seat_upgrade`: 비즈니스석, 1등석, 프리미엄 이코노미, 이코노미 컴포트, 고액 숙박·차량·통역 등 고비용 요소가 원문에 나온다.
-- `expense_forgery_or_inflation_terms`: 항공료 조작, 위·변조, 허위청구, 경비 부풀리기, 과다 청구 등 표현이 원문 또는 공식 점검자료에 나온다.
-- `tourism_or_private_itinerary`: 공식 일정·결과에 관광지, 자유일정, 쇼핑, 문화탐방, 박물관·성당·리조트 방문 등 공무 관련성이 문서상 설명되지 않는 일정이 나온다.
-- `low_official_schedule_density`: 출장기간 대비 공식 방문·면담·참관 일정이 적고 이동, 휴식, 만찬, 자유일정이 대부분이다.
-- `thin_result_or_photo_heavy`: 결과보고서가 사진, 국가 개황, 원론적 소감 중심이고 면담 결과, 수집자료, 제도 비교, 정책 활용 방안이 빈약하다.
-- `large_group_or_unclear_roles`: 출장자가 10명 이상이거나 수행인원이 많지만 개인별 역할·담당업무가 확인되지 않는다.
-- `third_party_or_interest`: 외부 기관·단체·개인 비용부담, 이해관계자 동행, 상호초청 등 공정성 확인이 필요한 정황이 있다.
-- `weak_review_transparency`: 계획서, 사전심사자료, 비용 정보, 사후심의 결과 중 핵심 자료가 공개 문서에서 확인되지 않는다.
-- `cancellation_or_agency_fee`: 여행사 위탁, 수의계약, 취소수수료, 예약 취소 비용, 과다 위약금 등 비용 리스크 표현이 있다.
-- `repeated_destination_or_same_purpose`: 같은 기관 게시판 안에서 같은 목적·같은 지역의 반복 출장이 확인되지만 반복 필요성이 문서상 설명되지 않는다.
-- `late_or_missing_report`: 등록일·출장기간 기준으로 결과보고서 제출 또는 공개 시점이 지연된 것으로 보이거나 확인 불가하다.
+- `tripDays`: 출장 시작일과 종료일이 확인될 때 산출한다.
+- `officialScheduleDays`: 주요일정 표에서 공식 방문·면담·참관·회의가 있는 날짜만 센다. 이동, 휴식, 만찬만 있는 날은 포함하지 않는다. 표 구조가 불명확하면 `null`로 둔다.
+- `perPersonCost`: 총액과 출장자 수가 모두 원문에서 확인될 때만 `총액 / 출장자 수`로 산출한다.
+- `registrationDelayDays`: 출장 종료일 다음날부터 선관위 공개 게시일까지의 일수다. 실제 BTIS 등록일이 아니므로 `registrationDelayBasis`에 이 한계를 적는다.
+- `registrationReferenceDays`: 인사혁신처 기준의 귀국 후 30일 이내 보고서 제출과 제출 후 15일 이내 등록을 합친 참고 기준 `45`를 둔다.
+- `registrationDelayStatus`: `기준 내`, `기준 초과(공개 게시일 기준)`, `계산 불가` 중 하나로 산술 결정한다.
 
-공식 기준으로 대조할 때는 인사혁신처 공무국외출장 심사기준, `공무원 여비 규정`, 행정안전부·국민권익위원회가 공개한 공무국외출장 사전·사후관리 강화 기준을 참고한다. 이 스킬은 해당 기준을 `검토 신호`로만 사용하며 최종 감사·법적 판단을 하지 않는다.
+### Disclosure
+
+공개 충분성은 핵심 항목 중 확인 가능한 개수로만 정한다. `disclosureLevel`은 `충분 공개`, `일부 미공개`, `대부분 미공개` 중 하나다.
+
+핵심 항목 10개:
+
+- `목적`
+- `기간`
+- `출장국·방문기관`
+- `출장자`
+- `주요일정`
+- `예산·집행액`
+- `산출내역`
+- `출장자별 역할`
+- `결과 활용계획`
+- `사전심사·사후심의 자료`
+
+결정 규칙:
+
+- 미기재 0~1개: `충분 공개`
+- 미기재 2~5개: `일부 미공개`
+- 미기재 6개 이상 또는 본문 추출 실패: `대부분 미공개`
+
+`transparencyGapCount`는 미기재 핵심 항목 개수다. 미기재 항목은 `unstated`에 넣고, 각 항목에는 `field`, `checkedScope`, `basis`를 적는다. 미기재 기반 신호는 `matched`로 세지 않는다.
+
+### Review signals
+
+`reviewSignals`는 원문 발췌가 있는 내용 기반 검토 신호만 담는다. 키워드만으로 매칭하지 않는다.
+
+기본 내용 패턴:
+
+- `high_cost_or_seat_upgrade`: 비즈니스석, 1등석, 프리미엄 이코노미, 이코노미 컴포트, 고액 숙박·차량·통역 표현
+- `tourism_or_private_itinerary`: 일정표 또는 결과 활동에 관광지, 자유일정, 쇼핑, 문화탐방, 박물관·성당·리조트 방문이 나오고 공무 관련성이 설명되지 않는 경우
+- `third_party_or_interest`: 외부 기관·단체·개인 비용부담, 이해관계자 동행, 상호초청 정황
+- `cancellation_penalty_or_fee`: 취소수수료, 위약금, 예약 취소 비용 등 비용 리스크. 여행사 위탁 자체는 매칭하지 않는다.
+- `plan_report_change_terms`: 계획 변경, 일정 변경, 방문기관 변경 등 계획 대비 이행 확인이 필요한 표현
+- `unexplained_large_group`: 출장자 10명 이상이고 개인별 역할이 원문에서 확인되지 않는 경우
+
+`matched` 항목은 반드시 `quote`, `quoteLocation`, `basis`, `sourcePattern`을 포함한다. 원문 발췌 없이 `matched`에 넣지 않는다. 확인한 기본 패턴 6개는 각각 `matched`, `cleared`, `contextFlags`, `notAssessable` 중 하나의 상태를 가져야 한다. `cleared`는 위 기본 패턴의 `id`에 대해서만 쓰며, `checkedScope`와 `basis`를 포함한다. `contextFlags`는 해변·바다·리조트처럼 단어는 보이지만 국가 개황, 선거운동 방식 설명, 배경자료 섹션에 있어 자동 매칭하면 위험한 경우에만 쓴다.
+
+단건 공개 보고서에서 확인할 수 없는 항목은 `notAssessable`에 넣는다. 예: 항공료 위·변조, 허위청구, 경비 부풀리기는 보고서 자체가 보통 자인하지 않으므로 v1의 매칭 패턴이 아니다. 같은 목적·같은 지역 반복 출장은 전체 게시판 정규화 스캔이 별도 실행된 경우에만 다룬다.
+
+### Recommended disclosure requests
+
+`disclosure.unstated`에서 기계적으로 정보공개청구 추천 문서를 만든다. 단정적 표현을 쓰지 말고 "공개 보고서에서 확인되지 않음"을 이유로 둔다.
+
+### Safe statements
+
+`safeStatements`는 자유 생성 문장이 아니라 템플릿으로 만든다.
+
+- `공개 보고서만으로는 <field>를 확인하기 어렵다.`
+- `<field> 확인을 위해 <document> 공개 여부 확인이 필요하다.`
+- `<number>는 공개 게시일 기준 산술값이며 실제 BTIS 등록일과 다를 수 있다.`
 
 ## Output shape
 
@@ -112,76 +148,141 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
 {
   "source": "중앙선거관리위원회 공무국외출장보고서 게시판",
   "sourceUrl": "https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107",
-  "title": "선거기관의 역할 및 대응사례 연구 등 국외출장보고서(오스트리아, 크로아티아)",
-  "publishedAt": "2026-03-13",
-  "institution": "중앙선거관리위원회",
-  "country": "오스트리아, 크로아티아",
-  "period": "2025. 11. 22.(토) ~ 11. 30.(일) [7박 9일]",
-  "purpose": "유럽 각국 선거관리위원회의 역할, 권한, 위법행위 규제 및 대응사례를 비교 연구하고 정책 개선 참고자료로 활용하기 위한 출장",
-  "summary": "오스트리아와 크로아티아의 선거관리기관 및 시민단체 방문·면담 내용을 바탕으로 선거 공정성 확보, 정치자금 투명성, 허위정보 대응 관련 시사점을 정리한 보고서입니다.",
-  "attachments": [
-    {
-      "title": "선거기관의역할및대응사례_연구_등_국외출장보고서(오스트리아_크로아티아).pdf",
-      "url": "https://www.nec.go.kr/common/board/Download.do?bcIdx=303199&cbIdx=1107&streFileNm=a148c7c6-e1e8-4e8b-85ab-f3d27ec74b1d.pdf",
-      "type": "pdf"
-    }
-  ],
-  "unstatedFields": [
-    "예산 또는 비용: 문서에서 확인 불가"
-  ],
-  "valueForMoneyReview": {
-    "overallSignal": "추가 검토 필요",
-    "auditRedFlags": {
-      "observedRedFlagCount": 2,
-      "checkedPatternCount": 12,
-      "matched": [
-        {
-          "id": "cost_missing_or_total_only",
-          "label": "비용 정보 미공개",
-          "basis": "보고서 본문에서 예산, 실제 집행액, 산출내역을 확인하지 못했습니다.",
-          "sourcePattern": "공무국외출장 심사기준과 사전·사후관리 강화 기준은 출장경비 적정성과 비용 공개를 검토 항목으로 둡니다."
-        },
-        {
-          "id": "weak_review_transparency",
-          "label": "사전심사·비용 자료 확인 불가",
-          "basis": "게시글과 첨부 보고서에서 사전 계획서, 심사자료, 비용 정보, 사후 심의 결과는 확인되지 않았습니다.",
-          "sourcePattern": "행안부 표준안은 출장계획서 사전공개, 비용 통합 심사, 출장 후 심의를 강화합니다."
-        }
-      ],
-      "cleared": [
-        {
-          "id": "institution_schedule_present",
-          "label": "방문기관·면담 일정 확인",
-          "basis": "오스트리아·크로아티아 선거관리기관 및 시민단체 방문과 면담 일정이 확인됩니다."
-        }
-      ],
-      "contextFlags": [],
-      "notAdjudication": "레드플래그 개수는 관측된 검토 항목 수입니다. 세금낭비, 위법, 부적정 집행 여부를 확정하지 않습니다."
-    },
-    "elementSignals": [
+  "facts": {
+    "title": "선거기관의 역할 및 대응사례 연구 등 국외출장보고서(오스트리아, 크로아티아)",
+    "publishedAt": "2026-03-13",
+    "institution": "중앙선거관리위원회",
+    "country": "오스트리아, 크로아티아",
+    "period": "2025. 11. 22.(토) ~ 11. 30.(일) [7박 9일]",
+    "purpose": "유럽 각국 선거관리위원회의 역할, 권한, 위법행위 규제 및 대응사례를 비교 연구하고 정책 개선 참고자료로 활용하기 위한 출장",
+    "summary": "오스트리아와 크로아티아의 선거관리기관 및 시민단체 방문·면담 내용을 바탕으로 선거 공정성 확보, 정치자금 투명성, 허위정보 대응 관련 시사점을 정리한 보고서입니다.",
+    "attachments": [
       {
-        "element": "목적·필요성",
-        "signal": "해소 신호",
-        "basis": "출장목적과 정책 개선 활용 방향이 문서에 기재되어 있습니다."
+        "title": "선거기관의역할및대응사례_연구_등_국외출장보고서(오스트리아_크로아티아).pdf",
+        "url": "https://www.nec.go.kr/common/board/Download.do?bcIdx=303199&cbIdx=1107&streFileNm=a148c7c6-e1e8-4e8b-85ab-f3d27ec74b1d.pdf",
+        "type": "pdf"
+      }
+    ]
+  },
+  "arithmetic": {
+    "tripDays": 9,
+    "officialScheduleDays": null,
+    "perPersonCost": null,
+    "registrationDelayDays": 103,
+    "registrationReferenceDays": 45,
+    "registrationDelayStatus": "기준 초과(공개 게시일 기준)",
+    "registrationDelayBasis": "출장 종료일 다음날부터 선관위 공개 게시일까지의 일수입니다. 실제 BTIS 등록일이 아니므로 참고값입니다."
+  },
+  "disclosure": {
+    "disclosureLevel": "일부 미공개",
+    "checkedFieldCount": 10,
+    "transparencyGapCount": 5,
+    "stated": [
+      "목적",
+      "기간",
+      "출장국·방문기관",
+      "출장자",
+      "주요일정"
+    ],
+    "unstated": [
+      {
+        "field": "예산·집행액",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "예산, 실제 집행액, 출장비 총액을 확인하지 못했습니다."
       },
       {
-        "element": "방문국·방문기관 적합성",
-        "signal": "해소 신호",
-        "basis": "오스트리아·크로아티아 선거관리기관 및 시민단체 방문이 확인됩니다."
+        "field": "산출내역",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "항공권, 숙박비, 일비 등 비용 산출내역을 확인하지 못했습니다."
       },
       {
-        "element": "일정 밀도",
-        "signal": "해소 신호",
-        "basis": "주요일정 표에 기관 방문·면담·자료수집 일정이 확인됩니다."
+        "field": "출장자별 역할",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "출장자 명단은 있으나 개인별 역할 분장은 확인하지 못했습니다."
       },
       {
-        "element": "비용 구조",
-        "signal": "비용 정보 미공개",
-        "basis": "문서에서 예산 또는 실제 집행 비용을 확인하지 못했습니다."
+        "field": "결과 활용계획",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "정책 반영 또는 제도 개선 활용계획은 별도 항목으로 확인하지 못했습니다."
+      },
+      {
+        "field": "사전심사·사후심의 자료",
+        "checkedScope": "게시글 상세와 첨부 보고서",
+        "basis": "사전심사자료와 사후심의 결과는 공개 문서에서 확인하지 못했습니다."
+      }
+    ]
+  },
+  "reviewSignals": {
+    "reviewSignalCount": 0,
+    "checkedPatternCount": 6,
+    "matched": [],
+    "cleared": [
+      {
+        "id": "high_cost_or_seat_upgrade",
+        "label": "고비용 좌석 표현 미확인",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "비즈니스석, 1등석, 프리미엄 이코노미, 이코노미 컴포트 표현을 확인하지 못했습니다."
+      },
+      {
+        "id": "tourism_or_private_itinerary",
+        "label": "관광·사적 일정 표현 미확인",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "공무 관련성 설명 없이 관광지, 자유일정, 쇼핑, 문화탐방, 리조트 방문으로 표시된 일정을 확인하지 못했습니다."
+      },
+      {
+        "id": "third_party_or_interest",
+        "label": "외부부담·이해관계 표현 미확인",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "외부 기관·단체·개인 비용부담, 이해관계자 동행, 상호초청 표현을 확인하지 못했습니다."
+      },
+      {
+        "id": "cancellation_penalty_or_fee",
+        "label": "취소수수료·위약금 표현 미확인",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "취소수수료, 위약금, 예약 취소 비용 표현을 확인하지 못했습니다."
+      },
+      {
+        "id": "plan_report_change_terms",
+        "label": "계획 대비 변경 표현 미확인",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "계획 변경, 일정 변경, 방문기관 변경 표현을 확인하지 못했습니다."
+      },
+      {
+        "id": "unexplained_large_group",
+        "label": "설명 없는 대규모 인원 표현 미확인",
+        "checkedScope": "kordoc 추출 Markdown 전체",
+        "basis": "출장자 10명 이상 또는 개인별 역할 없이 대규모 인원이 표시된 정황을 확인하지 못했습니다."
       }
     ],
-    "notAdjudication": "세금낭비 여부를 판정하지 않습니다. 비용 적정성은 예산·집행내역·증빙 추가 확인이 필요합니다."
+    "contextFlags": [],
+    "notAssessable": [
+      {
+        "id": "expense_forgery_or_inflation_terms",
+        "reason": "공개 결과보고서 자체에서 항공료 위·변조나 허위청구 여부를 확인하기 어렵습니다. 권익위 점검 결과 등 외부 감사자료 대조가 필요한 확장 항목입니다."
+      },
+      {
+        "id": "repeated_destination_or_same_purpose",
+        "reason": "단건 보고서 요약에서는 반복 출장을 판단하지 않습니다. 전체 게시판 제목·국가·목적 정규화 스캔이 별도 실행되어야 합니다."
+      }
+    ],
+    "notAdjudication": "검토 신호는 원문 인용 기반 확인 항목입니다. 세금낭비, 위법, 부적정 집행 여부를 확정하지 않습니다."
   },
+  "recommendedDisclosureRequests": [
+    {
+      "document": "출장계획서 및 사전심사자료",
+      "reason": "사전심사자료가 공개 문서에서 확인되지 않습니다.",
+      "targetOrg": "중앙선거관리위원회"
+    },
+    {
+      "document": "항공권·숙박비·일비 등 출장비 산출내역",
+      "reason": "예산, 집행액, 비용 산출내역이 공개 보고서에서 확인되지 않습니다.",
+      "targetOrg": "중앙선거관리위원회"
+    }
+  ],
+  "safeStatements": [
+    "공개 보고서만으로는 예산·집행액과 산출내역을 확인하기 어렵다.",
+    "registrationDelayDays는 공개 게시일 기준 산술값이며 실제 BTIS 등록일과 다를 수 있다."
+  ],
   "notes": [
     "이 결과는 공식 공개 문서를 기준으로 한 참고용 요약입니다.",
     "문서에 없는 정보는 추정하지 않았습니다.",
@@ -190,7 +291,7 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
 }
 ```
 
-`unstatedFields`, `valueForMoneyReview`, `valueForMoneyReview.auditRedFlags`는 핵심 필드다. 일정, 예산, 동행자 정보가 구조적으로 없을 수 있으므로 `없다`고 단정하지 말고 `문서에서 확인 불가` 또는 `기재되어 있지 않음`으로 표현한다.
+`facts`, `arithmetic`, `disclosure`, `reviewSignals`, `recommendedDisclosureRequests`, `safeStatements`는 핵심 필드다. 일정, 예산, 동행자 정보가 구조적으로 없을 수 있으므로 `없다`고 단정하지 말고 `문서에서 확인 불가` 또는 `기재되어 있지 않음`으로 표현한다.
 
 ## Safety rules
 
@@ -219,7 +320,6 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
 - 카르텔
 - 유착
 - 대가성
-- 레드플래그 점수
 
 사용 권장 표현:
 
@@ -231,17 +331,20 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
 - 일반 범위로 보임
 - 고비용 요소 확인
 - 규정 대조 필요
-- 낭비 의심 신호 낮음
-- 낭비 의심 신호 높음
 - 추가 자료 필요
 - 원문 확인 필요
 - 참고용 요약
-- 관측된 레드플래그
-- 레드플래그 개수는 판정이 아님
+- 일부 미공개
+- 대부분 미공개
+- 검토 신호
+- 공개 보고서 기준
+- 원문 인용 기준
+- 정보공개청구 추천
 
 ## What this skill does not do
 
 - 부정, 위법, 외유 여부 판정
+- 부정부패 탐지 또는 세금낭비 판별
 - 위험도 점수화, 랭킹, 관계망 분석
 - 가족관계, 배우자, 동행자 추정
 - 상호초청, 호혜성, 대가성 분석
