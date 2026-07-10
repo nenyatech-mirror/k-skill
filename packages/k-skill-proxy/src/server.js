@@ -86,7 +86,6 @@ const NEIS_SCHOOL_INFO_URL = "https://open.neis.go.kr/hub/schoolInfo";
 const ALLOWED_AIRKOREA_ROUTES = new Map([
   ["MsrstnInfoInqireSvc", new Set(["getMsrstnList", "getNearbyMsrstnList", "getTMStdrCrdnt"])],
   ["ArpltnInforInqireSvc", new Set(["getMsrstnAcctoRltmMesureDnsty", "getCtprvnRltmMesureDnsty"])],
-  ["UserSportSvc", new Set(["getSvckeyDalyStats"])],
 ]);
 
 function parseInteger(value, fallback) {

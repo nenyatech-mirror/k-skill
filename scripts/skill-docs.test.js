@@ -694,6 +694,10 @@ test("proxy deployment workflow and docs stay aligned with Cloud Run automation"
   assert.match(deployDoc, /GCP Secret Manager|Secret Manager/);
   assert.match(deployDoc, /0% traffic/);
   assert.match(deployDoc, /smoke test 통과 후 새 revision으로 production traffic/);
+  assert.match(deployDoc, /--revision-suffix="\$SHA"/);
+  assert.match(deployDoc, /--no-traffic/);
+  assert.match(deployDoc, /CANDIDATE_URL=/);
+  assert.match(deployDoc, /--to-revisions="\$\{REVISION_NAME\}=100"/);
 });
 
 test("kakaotalk-mac skill documents katok archive search usage", () => {

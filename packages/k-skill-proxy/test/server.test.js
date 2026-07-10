@@ -2638,6 +2638,26 @@ test("public AirKorea passthrough route forwards allowed upstream responses", as
   assert.match(response.body, /resultCode/);
 });
 
+test("public AirKorea passthrough does not expose service-key usage statistics", async (t) => {
+  const app = buildServer({
+    env: {
+      AIR_KOREA_OPEN_API_KEY: "airkorea-key"
+    }
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/B552584/UserSportSvc/getSvckeyDalyStats?returnType=json"
+  });
+
+  assert.equal(response.statusCode, 404);
+  assert.equal(response.json().error, "not_found");
+});
+
 test("fine dust upstream failures do not expose the AirKorea service key", async (t) => {
   const originalFetch = global.fetch;
   global.fetch = async () => new Response("failed serviceKey=airkorea-secret", { status: 500 });

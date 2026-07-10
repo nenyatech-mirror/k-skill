@@ -193,6 +193,7 @@ done
 ```bash
 SHA="$(git rev-parse HEAD)"
 IMAGE_URI="asia-northeast1-docker.pkg.dev/k-skill-proxy/k-skill/k-skill-proxy:${SHA}"
+REVISION_NAME="k-skill-proxy-${SHA}"
 
 gcloud auth configure-docker asia-northeast1-docker.pkg.dev --quiet
 docker build -t "$IMAGE_URI" -f packages/k-skill-proxy/Dockerfile .
@@ -203,10 +204,36 @@ gcloud run deploy k-skill-proxy \
   --region=asia-northeast1 \
   --platform=managed \
   --allow-unauthenticated \
+  --tag=candidate \
+  --revision-suffix="$SHA" \
+  --no-traffic \
   --execution-environment=gen2 \
   --cpu=1 --memory=512Mi --min-instances=0 --max-instances=3 \
   --concurrency=80 --timeout=60 --cpu-boost \
   --project=k-skill-proxy
+
+CANDIDATE_URL="$(gcloud run services describe k-skill-proxy \
+  --region=asia-northeast1 \
+  --project=k-skill-proxy \
+  --format='value(status.traffic[?tag=candidate].url)')"
+
+curl -fsS --max-time 15 "${CANDIDATE_URL}/health" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+if not data.get("ok"):
+    raise SystemExit("candidate health check failed")
+missing = [k for k, v in data.get("upstreams", {}).items() if k.endswith("Configured") and v is not True]
+if missing:
+    raise SystemExit(f"candidate upstreams not configured: {missing}")
+'
+
+gcloud run services update-traffic k-skill-proxy \
+  --region=asia-northeast1 \
+  --project=k-skill-proxy \
+  --to-revisions="${REVISION_NAME}=100" \
+  --quiet
+
+curl -fsS --max-time 15 https://k-skill-proxy.nomadamas.org/health
 ```
 
 이 명령은 평상시에는 필요 없습니다. GitHub Actions가 같은 일을 하기 때문입니다.
