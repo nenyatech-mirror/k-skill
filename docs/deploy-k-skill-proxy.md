@@ -71,8 +71,8 @@ gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_ID" \
   --workload-identity-pool="$POOL_ID" \
   --display-name="GitHub OIDC" \
   --issuer-uri="https://token.actions.githubusercontent.com" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref,attribute.job_workflow_ref=assertion.job_workflow_ref" \
-  --attribute-condition="assertion.repository == '${GH_REPO}' && assertion.ref == 'refs/heads/main' && assertion.job_workflow_ref == '${GH_REPO}/.github/workflows/deploy-k-skill-proxy.yml@refs/heads/main'"
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref,attribute.workflow_ref=assertion.workflow_ref" \
+  --attribute-condition="assertion.repository == '${GH_REPO}' && assertion.ref == 'refs/heads/main' && assertion.workflow_ref == '${GH_REPO}/.github/workflows/deploy-k-skill-proxy.yml@refs/heads/main'"
 ```
 
 > `attribute-condition`은 토큰 발급 단계에서 저장소, `main` ref, 배포 워크플로 identity를 모두 고정합니다. 다른 브랜치나 다른 workflow가 같은 pool과 deploy SA를 재사용해 production 권한을 얻지 못하게 하는 핵심 가드입니다.
@@ -84,8 +84,8 @@ gcloud iam workload-identity-pools providers update-oidc "$PROVIDER_ID" \
   --project="$PROJECT_ID" \
   --location=global \
   --workload-identity-pool="$POOL_ID" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref,attribute.job_workflow_ref=assertion.job_workflow_ref" \
-  --attribute-condition="assertion.repository == '${GH_REPO}' && assertion.ref == 'refs/heads/main' && assertion.job_workflow_ref == '${GH_REPO}/.github/workflows/deploy-k-skill-proxy.yml@refs/heads/main'"
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref,attribute.workflow_ref=assertion.workflow_ref" \
+  --attribute-condition="assertion.repository == '${GH_REPO}' && assertion.ref == 'refs/heads/main' && assertion.workflow_ref == '${GH_REPO}/.github/workflows/deploy-k-skill-proxy.yml@refs/heads/main'"
 ```
 
 ### 3) Deploy service account 생성
