@@ -1,6 +1,7 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const { EventEmitter } = require("node:events")
 const test = require("node:test")
 
 const runtime = require("../src")
@@ -178,6 +179,21 @@ test("Aside REPL session queue recovers after a failed command", async () => {
   assert.deepEqual(calls, ["fail", "cleanup"])
 })
 
+test("Aside REPL readiness timeout terminates the spawned child", async () => {
+  const session = new runtime.AsideReplSession({ asideTimeoutMs: 10 })
+  const stdout = new EventEmitter()
+  const stderr = new EventEmitter()
+  const child = new EventEmitter()
+  child.stdout = stdout
+  child.stderr = stderr
+  child.killed = false
+  child.kill = () => { child.killed = true }
+  session.child = child
+
+  await assert.rejects(() => session.waitForPrompt(), /did not become ready/)
+  assert.equal(child.killed, true, "timed-out Aside child must be terminated")
+})
+
 test("auto provider throws UNAVAILABLE when neither BrowserOS nor Chrome CDP is reachable", async () => {
   await assert.rejects(
     () => runtime.connect({
@@ -246,6 +262,22 @@ test("automation page marks newly created context and page as owned", async () =
   assert.equal(session.ownsPage, true)
   await runtime.cleanupAutomationPage(session)
   assert.equal(createdPage.closeCalled, true)
+  assert.equal(createdContext.closeCalled, true)
+})
+
+test("automation page closes a newly created context when newPage fails", async () => {
+  const createdContext = {
+    closeCalled: false,
+    pages() { return [] },
+    async newPage() { throw new Error("page creation failed") },
+    async close() { this.closeCalled = true }
+  }
+  const browser = {
+    contexts() { return [] },
+    async newContext() { return createdContext }
+  }
+
+  await assert.rejects(() => runtime.getAutomationPage(browser), /page creation failed/)
   assert.equal(createdContext.closeCalled, true)
 })
 

@@ -26,8 +26,15 @@ async function getAutomationPage(browser, options = {}) {
   if (reuseDefaultContext && existingPages[0]) {
     page = existingPages[0]
   } else {
-    page = await context.newPage()
-    ownsPage = true
+    try {
+      page = await context.newPage()
+      ownsPage = true
+    } catch (error) {
+      if (ownsContext && typeof context.close === "function") {
+        await context.close().catch(() => {})
+      }
+      throw error
+    }
   }
 
   return {

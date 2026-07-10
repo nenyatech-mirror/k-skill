@@ -59,6 +59,7 @@ class AsideReplSession {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         cleanup()
+        if (this.child && !this.child.killed) this.child.kill()
         reject(createUnavailableError("Aside Browser REPL did not become ready.", { command: this.command }))
       }, this.timeoutMs)
       const onData = () => {
