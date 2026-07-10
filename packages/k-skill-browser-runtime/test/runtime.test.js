@@ -1,5 +1,7 @@
 "use strict"
 
+// allow: SIZE_OK - Cohesive provider-selection and resource-ownership runtime matrix.
+
 const assert = require("node:assert/strict")
 const { EventEmitter } = require("node:events")
 const test = require("node:test")

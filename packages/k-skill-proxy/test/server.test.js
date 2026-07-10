@@ -1,3 +1,4 @@
+// allow: SIZE_OK - Integration suite intentionally validates the assembled proxy across route groups.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -2559,6 +2560,23 @@ test("proxyAirKoreaRequest injects serviceKey and preserves caller query params"
   assert.match(calledUrl, /\/B552584\/ArpltnInforInqireSvc\/getMsrstnAcctoRltmMesureDnsty\?/);
   assert.match(calledUrl, /stationName=%EA%B0%95%EB%82%A8%EA%B5%AC/);
   assert.match(calledUrl, /serviceKey=test-service-key/);
+});
+
+test("proxyAirKoreaRequest redacts a service key echoed by upstream", async () => {
+  const result = await proxyAirKoreaRequest({
+    service: "ArpltnInforInqireSvc",
+    operation: "getMsrstnAcctoRltmMesureDnsty",
+    query: { returnType: "json", stationName: "강남구" },
+    serviceKey: "airkorea-secret+/=",
+    fetchImpl: async () => new Response(
+      "failed serviceKey=airkorea-secret+/= encoded=airkorea-secret%2B%2F%3D",
+      { status: 500, headers: { "content-type": "text/plain" } }
+    )
+  });
+
+  assert.equal(result.statusCode, 500);
+  assert.doesNotMatch(result.body, /airkorea-secret/);
+  assert.match(result.body, /\[REDACTED\]/);
 });
 
 test("public AirKorea passthrough route forwards allowed upstream responses", async (t) => {

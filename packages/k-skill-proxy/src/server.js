@@ -1,3 +1,4 @@
+// allow: SIZE_OK - Central Fastify composition root; provider logic is split into route modules.
 const crypto = require("node:crypto");
 const Fastify = require("fastify");
 const { LogController } = Fastify;
@@ -1247,6 +1248,16 @@ function isAllowedAirKoreaRoute(service, operation) {
   return ALLOWED_AIRKOREA_ROUTES.get(service)?.has(operation) || false;
 }
 
+function redactSecretValue(text, secret) {
+  let redacted = String(text);
+  for (const candidate of [String(secret), encodeURIComponent(String(secret))]) {
+    if (candidate) {
+      redacted = redacted.split(candidate).join("[REDACTED]");
+    }
+  }
+  return redacted;
+}
+
 async function proxyAirKoreaRequest({ service, operation, query, serviceKey, fetchImpl = global.fetch }) {
   if (!serviceKey) {
     return {
@@ -1288,10 +1299,11 @@ async function proxyAirKoreaRequest({ service, operation, query, serviceKey, fet
   const response = await fetchImpl(url, {
     signal: AbortSignal.timeout(20000)
   });
+  const body = await response.text();
   return {
     statusCode: response.status,
     contentType: response.headers.get("content-type") || "application/json; charset=utf-8",
-    body: await response.text()
+    body: redactSecretValue(body, serviceKey)
   };
 }
 
