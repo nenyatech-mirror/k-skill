@@ -69,6 +69,7 @@ const {
 } = require("./nhis-care");
 const { isKopisErrorBody, normalizeKopisDetailQuery, normalizeKopisListQuery, proxyKopisRequest } = require("./kopis");
 const {
+  isKrWhoisSuccessBody,
   normalizeKrWhoisAsQuery,
   normalizeKrWhoisDomainQuery,
   normalizeKrWhoisIpQuery,
@@ -2742,7 +2743,7 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
       serviceKey: config.molitApiKey
     });
 
-    if (upstream.statusCode >= 200 && upstream.statusCode < 300) {
+    if (upstream.statusCode >= 200 && upstream.statusCode < 300 && isKrWhoisSuccessBody(upstream.body)) {
       cache.set(cacheKey, upstream, config.cacheTtlMs);
     }
 
@@ -2773,7 +2774,7 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
       params: normalized,
       serviceKey: config.molitApiKey
     });
-    if (upstream.statusCode >= 200 && upstream.statusCode < 300) {
+    if (upstream.statusCode >= 200 && upstream.statusCode < 300 && isKrWhoisSuccessBody(upstream.body)) {
       cache.set(cacheKey, upstream, config.cacheTtlMs);
     }
     reply.code(upstream.statusCode);
@@ -2803,7 +2804,7 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
       params: normalized,
       serviceKey: config.molitApiKey
     });
-    if (upstream.statusCode >= 200 && upstream.statusCode < 300) {
+    if (upstream.statusCode >= 200 && upstream.statusCode < 300 && isKrWhoisSuccessBody(upstream.body)) {
       cache.set(cacheKey, upstream, config.cacheTtlMs);
     }
     reply.code(upstream.statusCode);

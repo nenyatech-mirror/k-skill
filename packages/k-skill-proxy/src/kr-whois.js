@@ -62,6 +62,29 @@ function isKrWhoisGatewayError(text) {
   return text.includes("<OpenAPI_ServiceResponse") || text.includes("SERVICE KEY IS NOT REGISTERED");
 }
 
+function redactSecretValue(text, secret) {
+  let redacted = String(text);
+  const encodedSecret = new URLSearchParams({ serviceKey: String(secret) })
+    .toString()
+    .slice("serviceKey=".length);
+  for (const candidate of new Set([String(secret), encodedSecret])) {
+    if (candidate) {
+      redacted = redacted.split(candidate).join("[REDACTED]");
+    }
+  }
+  return redacted.replace(/serviceKey(?:=|%3D)[^&\s"'<>\\]+/giu, "serviceKey=[REDACTED]");
+}
+
+function isKrWhoisSuccessBody(text) {
+  try {
+    const payload = JSON.parse(String(text));
+    const resultCode = payload?.response?.result?.result_code ?? payload?.result_code;
+    return String(resultCode) === "10000";
+  } catch {
+    return false;
+  }
+}
+
 async function proxyKrWhoisRequest({ url: upstreamUrl, params, serviceKey, fetchImpl = global.fetch }) {
   if (!serviceKey) {
     return {
@@ -82,7 +105,7 @@ async function proxyKrWhoisRequest({ url: upstreamUrl, params, serviceKey, fetch
   const response = await fetchImpl(url.toString(), {
     signal: AbortSignal.timeout(20000)
   });
-  const body = await response.text();
+  const body = redactSecretValue(await response.text(), serviceKey);
   if (isKrWhoisGatewayError(body)) {
     return {
       statusCode: 502,
@@ -116,6 +139,7 @@ module.exports = {
   KR_WHOIS_AS_URL,
   KR_WHOIS_DOMAIN_URL,
   KR_WHOIS_IP_URL,
+  isKrWhoisSuccessBody,
   normalizeKrWhoisAsQuery,
   normalizeKrWhoisDomainQuery,
   normalizeKrWhoisIpQuery,
