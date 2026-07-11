@@ -1,4 +1,8 @@
+const { isIP } = require("node:net");
+
 const KR_WHOIS_DOMAIN_URL = "https://apis.data.go.kr/B551505/whois/domain_name";
+const KR_WHOIS_IP_URL = "https://apis.data.go.kr/B551505/whois/ip_address";
+const KR_WHOIS_AS_URL = "https://apis.data.go.kr/B551505/whois/as_number";
 
 function trimOrNull(value) {
   if (value === undefined || value === null) {
@@ -27,11 +31,38 @@ function normalizeKrWhoisDomainQuery(query = {}) {
   return { query: normalized, answer: "json" };
 }
 
+function normalizeKrWhoisIpQuery(query = {}) {
+  const ip = trimOrNull(query.ip ?? query.query ?? query.q);
+  if (!ip) {
+    throw new Error("Provide IP address.");
+  }
+  if (!isIP(ip)) {
+    throw new Error("Provide a valid IP address.");
+  }
+  return { query: ip.toLowerCase(), answer: "json" };
+}
+
+function normalizeKrWhoisAsQuery(query = {}) {
+  const raw = trimOrNull(query.asn ?? query.as ?? query.query ?? query.q);
+  if (!raw) {
+    throw new Error("Provide AS number.");
+  }
+  const match = /^AS([0-9]+)$/i.exec(raw);
+  if (!match) {
+    throw new Error("Provide AS number in AS1234 format.");
+  }
+  const number = Number.parseInt(match[1], 10);
+  if (!Number.isSafeInteger(number) || number < 1 || number > 4294967295) {
+    throw new Error("Provide a valid AS number.");
+  }
+  return { query: `AS${number}`, answer: "json" };
+}
+
 function isKrWhoisGatewayError(text) {
   return text.includes("<OpenAPI_ServiceResponse") || text.includes("SERVICE KEY IS NOT REGISTERED");
 }
 
-async function proxyKrWhoisDomainRequest({ params, serviceKey, fetchImpl = global.fetch }) {
+async function proxyKrWhoisRequest({ url: upstreamUrl, params, serviceKey, fetchImpl = global.fetch }) {
   if (!serviceKey) {
     return {
       statusCode: 503,
@@ -43,7 +74,7 @@ async function proxyKrWhoisDomainRequest({ params, serviceKey, fetchImpl = globa
     };
   }
 
-  const url = new URL(KR_WHOIS_DOMAIN_URL);
+  const url = new URL(upstreamUrl);
   url.searchParams.set("serviceKey", serviceKey);
   url.searchParams.set("query", params.query);
   url.searchParams.set("answer", params.answer);
@@ -69,8 +100,26 @@ async function proxyKrWhoisDomainRequest({ params, serviceKey, fetchImpl = globa
   };
 }
 
+function proxyKrWhoisDomainRequest(options) {
+  return proxyKrWhoisRequest({ ...options, url: KR_WHOIS_DOMAIN_URL });
+}
+
+function proxyKrWhoisIpRequest(options) {
+  return proxyKrWhoisRequest({ ...options, url: KR_WHOIS_IP_URL });
+}
+
+function proxyKrWhoisAsRequest(options) {
+  return proxyKrWhoisRequest({ ...options, url: KR_WHOIS_AS_URL });
+}
+
 module.exports = {
+  KR_WHOIS_AS_URL,
   KR_WHOIS_DOMAIN_URL,
+  KR_WHOIS_IP_URL,
+  normalizeKrWhoisAsQuery,
   normalizeKrWhoisDomainQuery,
-  proxyKrWhoisDomainRequest
+  normalizeKrWhoisIpQuery,
+  proxyKrWhoisAsRequest,
+  proxyKrWhoisDomainRequest,
+  proxyKrWhoisIpRequest
 };
