@@ -270,7 +270,17 @@ async function proxyVWorldRequest({
     }
   }
 
-  const body = redactCredential(await response.text(), credential);
+  let responseBody;
+  try {
+    responseBody = await response.text();
+  } catch {
+    const error = new Error("VWorld upstream response body failed.");
+    error.code = "upstream_error";
+    error.statusCode = 502;
+    throw error;
+  }
+
+  const body = redactCredential(responseBody, credential);
   return {
     statusCode: response.status,
     contentType: response.headers.get("content-type") || "application/json; charset=utf-8",

@@ -159,6 +159,31 @@ test("rejects redirected VWorld responses even when a custom fetch ignores redir
   );
 });
 
+test("sanitizes VWorld response-body read failures", async () => {
+  const secret = "synthetic-secret";
+  await assert.rejects(
+    proxyVWorldRequest({
+      operation: "search",
+      params: normalizeVWorldSearchQuery({ query: "강나루현대", type: "place" }),
+      apiKey: secret,
+      fetchImpl: async () => ({
+        redirected: false,
+        url: "https://api.vworld.kr/req/search",
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        text: async () => {
+          throw new Error(`body failed at https://api.vworld.kr/req/search?key=${secret}`);
+        }
+      })
+    }),
+    (error) =>
+      error.code === "upstream_error" &&
+      error.statusCode === 502 &&
+      error.message === "VWorld upstream response body failed." &&
+      !error.message.includes(secret)
+  );
+});
+
 test("VWorld search route delegates its header credential, caches success, and never accepts query credentials", async (t) => {
   const originalFetch = global.fetch;
   const calls = [];
