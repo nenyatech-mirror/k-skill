@@ -7,6 +7,7 @@ const MAX_SEARCH_SIZE = 100;
 const MAX_PRICE_ROWS = 1000;
 const MIN_PRICE_YEAR = 2005;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_CREDENTIAL_DECODE_DEPTH = 16;
 
 function trimOrNull(value) {
   if (value === undefined || value === null) {
@@ -191,25 +192,37 @@ function redactCredential(body, apiKey) {
 
 function containsCredentialEncoding(value, apiKey) {
   let candidate = String(value);
-  const seen = new Set();
-  while (!seen.has(candidate)) {
-    seen.add(candidate);
+  for (let depth = 0; depth < MAX_CREDENTIAL_DECODE_DEPTH; depth += 1) {
     if (candidate.includes(apiKey)) {
       return true;
     }
     const unicodeDecoded = candidate
       .replace(/\\u([0-9a-f]{4})/giu, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
       .replace(/%u([0-9a-f]{4})/giu, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
-    let urlDecoded = unicodeDecoded;
-    try {
-      urlDecoded = decodeURIComponent(unicodeDecoded);
-    } catch {}
-    if (urlDecoded === candidate) {
+    const percentDecoded = unicodeDecoded.replace(/(?:%[0-9a-f]{2})+/giu, (sequence) => {
+      try {
+        return decodeURIComponent(sequence);
+      } catch {
+        return sequence.replace(/%([0-9a-f]{2})/giu, (_, hex) => (
+          String.fromCharCode(Number.parseInt(hex, 16))
+        ));
+      }
+    });
+    if (
+      percentDecoded.includes(apiKey) ||
+      percentDecoded.replace(/\+/g, " ").includes(apiKey)
+    ) {
+      return true;
+    }
+    if (percentDecoded === candidate) {
       return false;
     }
-    candidate = urlDecoded;
+    candidate = percentDecoded;
   }
-  return false;
+  return (
+    candidate.includes(apiKey) ||
+    /(?:%[0-9a-f]{2}|%u[0-9a-f]{4}|\\u[0-9a-f]{4})/iu.test(candidate)
+  );
 }
 
 function projectString(value, apiKey, maxLength) {

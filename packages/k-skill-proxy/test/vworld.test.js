@@ -169,6 +169,33 @@ test("response projection replaces upstream error codes with fixed safe values",
   });
 });
 
+test("response projection fails closed for malformed and deeply nested credential encodings", () => {
+  const secret = "SyntheticSecret";
+  let deeplyEncoded = secret;
+  for (let depth = 0; depth < 32; depth += 1) {
+    deeplyEncoded = encodeURIComponent(deeplyEncoded);
+  }
+  const projected = JSON.parse(projectVWorldBody(
+    "search",
+    JSON.stringify({
+      response: {
+        status: "OK",
+        result: {
+          items: [{
+            id: "1150010400104480001",
+            title: "%ZZ%53ynthetic%53ecret",
+            address: { parcel: deeplyEncoded, road: "서울 강서구" }
+          }]
+        }
+      }
+    }),
+    secret
+  ));
+
+  assert.equal(projected.response.result.items[0].title, "[REDACTED]");
+  assert.equal(projected.response.result.items[0].address.parcel, "[REDACTED]");
+});
+
 test("response projection never truncates an invalid price identity into a valid one", () => {
   const body = projectVWorldBody(
     "prices",
@@ -326,7 +353,7 @@ test("VWorld search route delegates its header credential, caches success, and n
   assert.equal(first.headers.vary, "x-k-skill-vworld-api-key");
 });
 
-test("VWorld apartment-price route preserves JSON and does not cache semantic errors", async (t) => {
+test("VWorld apartment-price route preserves JSON and never caches price pages", async (t) => {
   const originalFetch = global.fetch;
   let calls = 0;
   global.fetch = async () => {
@@ -364,7 +391,7 @@ test("VWorld apartment-price route preserves JSON and does not cache semantic er
   assert.equal(failed.json().apartHousingPrices.resultCode, "UPSTREAM_ERROR");
   assert.equal(recovered.json().apartHousingPrices.field[0].pblntfPc, "587000000");
   assert.deepEqual(cached.json(), recovered.json());
-  assert.equal(calls, 2, "semantic failures must not be cached, while the recovered response must be cached");
+  assert.equal(calls, 3, "price pages must never be cached across independent snapshots");
 });
 
 test("VWorld routes do not cache structurally incomplete success envelopes", async (t) => {
@@ -397,7 +424,7 @@ test("VWorld routes do not cache structurally incomplete success envelopes", asy
   assert.equal(priceCalls, 2);
 });
 
-test("VWorld apartment-price route does not cache a response for a different page", async (t) => {
+test("VWorld apartment-price route does not cache any page response", async (t) => {
   const originalFetch = global.fetch;
   let calls = 0;
   global.fetch = async () => {
@@ -431,7 +458,7 @@ test("VWorld apartment-price route does not cache a response for a different pag
   assert.equal(wrongPage.json().apartHousingPrices.pageNo, "2");
   assert.equal(recovered.json().apartHousingPrices.pageNo, "1");
   assert.deepEqual(cached.json(), recovered.json());
-  assert.equal(calls, 2, "a wrong-page response must not enter the successful-response cache");
+  assert.equal(calls, 3, "neither a wrong page nor a recovered price page may be cached");
 });
 
 test("credential-scoped cache and projected responses reject reversible credential encodings", async (t) => {

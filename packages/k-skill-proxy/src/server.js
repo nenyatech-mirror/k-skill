@@ -2171,6 +2171,7 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
 
     const upstream = await proxyVWorldRequest({ operation, params: normalized, apiKey });
     if (
+      operation === "search" &&
       upstream.statusCode >= 200 &&
       upstream.statusCode < 300 &&
       isVWorldSuccessBody(operation, upstream.body, normalized)
