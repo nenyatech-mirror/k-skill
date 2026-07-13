@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Read-only building-register title lookup helper using stdlib only."""
+# allow: SIZE_OK - Cohesive Building Register CLI adapter covering normalization, transport, and output contracts.
 
 from __future__ import annotations
 
@@ -85,16 +86,18 @@ def normalize_parcel(pnu: Optional[str], sigungu_cd: Optional[str], bjdong_cd: O
         raise HelperError("PNU와 개별 법정동/필지 값은 같이 입력할 수 없습니다.")
     if pnu:
         normalized_pnu = _exact_digits(pnu, 19, "PNU")
+        land_category = normalized_pnu[10:11]
+        plat_gb_cd_by_land_category = {"1": "0", "2": "1"}
+        if land_category not in plat_gb_cd_by_land_category:
+            raise HelperError("PNU 토지구분 값은 1(일반 토지) 또는 2(산)여야 합니다.")
         result = {
             "pnu": normalized_pnu,
             "sigunguCd": normalized_pnu[:5],
             "bjdongCd": normalized_pnu[5:10],
-            "platGbCd": normalized_pnu[10:11],
+            "platGbCd": plat_gb_cd_by_land_category[land_category],
             "bun": normalized_pnu[11:15],
             "ji": normalized_pnu[15:19],
         }
-        if result["platGbCd"] not in {"0", "1", "2"}:
-            raise HelperError("PNU의 platGbCd 값이 올바르지 않습니다.")
         return result
     if not explicit:
         raise HelperError("--pnu, --address 또는 개별 법정동/필지 값을 입력하세요.")
@@ -105,14 +108,18 @@ def normalize_parcel(pnu: Optional[str], sigungu_cd: Optional[str], bjdong_cd: O
         raise HelperError("platGbCd 값은 0, 1, 2 중 하나여야 합니다.")
     main = _parcel(bun, "bun", required=True)
     sub = _parcel(ji, "ji")
-    return {
-        "pnu": f"{sigungu}{bjdong}{plat}{main}{sub}",
+    result = {
         "sigunguCd": sigungu,
         "bjdongCd": bjdong,
         "platGbCd": plat,
         "bun": main,
         "ji": sub,
     }
+    land_category_by_plat_gb_cd = {"0": "1", "1": "2"}
+    land_category = land_category_by_plat_gb_cd.get(plat)
+    if land_category is not None:
+        result["pnu"] = f"{sigungu}{bjdong}{land_category}{main}{sub}"
+    return result
 
 
 def build_query(args: argparse.Namespace) -> Dict[str, Any]:
@@ -158,7 +165,10 @@ def build_title_url(args: argparse.Namespace, query: Dict[str, Any], api_key: Op
         direct_query = {key: value for key, value in query.items() if key != "pnu"}
         direct_query["serviceKey"] = api_key
         return f"{UPSTREAM_URL}?{urllib.parse.urlencode(direct_query)}"
-    proxy_query = {key: value for key, value in query.items() if key not in {"sigunguCd", "bjdongCd", "platGbCd", "bun", "ji"}}
+    if args.pnu:
+        proxy_query = {key: value for key, value in query.items() if key not in {"sigunguCd", "bjdongCd", "platGbCd", "bun", "ji"}}
+    else:
+        proxy_query = {key: value for key, value in query.items() if key != "pnu"}
     return f"{args.proxy_base_url.rstrip('/')}/v1/building-register/title?{urllib.parse.urlencode(proxy_query)}"
 
 
@@ -260,7 +270,14 @@ def run(argv: Optional[list[str]] = None) -> int:
                 raise HelperError("--address와 PNU/개별 필지 값은 같이 입력할 수 없습니다.")
             geocode_url = f"{args.proxy_base_url.rstrip('/')}/v1/kakao-local/geocode?{urllib.parse.urlencode({'q': args.address, 'limit': 2})}"
             if args.dry_run:
-                print(json.dumps({"operation": "title", "geocode_url": geocode_url, "next": "/v1/building-register/title?pnu=<derived>"}, ensure_ascii=False, indent=2))
+                print(json.dumps({
+                    "operation": "title",
+                    "geocode_url": geocode_url,
+                    "next": (
+                        "/v1/building-register/title?sigunguCd=<derived>&bjdongCd=<derived>"
+                        "&platGbCd=<derived>&bun=<derived>&ji=<derived>"
+                    ),
+                }, ensure_ascii=False, indent=2))
                 return 0
             address_payload = http_get_json(geocode_url, args.timeout, via_proxy=True)
             query = query_from_address_payload(address_payload)

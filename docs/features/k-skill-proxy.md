@@ -203,8 +203,10 @@ curl -fsS --get 'https://k-skill-proxy.nomadamas.org/v1/ev-charger/status' \
 
 ```bash
 curl -fsS --get 'https://k-skill-proxy.nomadamas.org/v1/building-register/title' \
-  --data-urlencode 'pnu=1168010100001230004'
+  --data-urlencode 'pnu=1168010100101230004'
 ```
+
+PNU의 11번째 자리는 토지구분으로 `1`은 일반 토지, `2`는 산이다. proxy는 이를 건축물대장 API의 `platGbCd=0`, `platGbCd=1`로 각각 변환한다.
 
 데이터셋 `15134735` 활용신청은 별도로 필요하며 자동승인 후에도 활성화 전에는 `502 upstream_forbidden`이 반환될 수 있다. `/health`의 `buildingRegisterConfigured`는 서버 키 설정 여부만 나타낸다.
 

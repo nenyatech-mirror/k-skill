@@ -8,23 +8,23 @@
 
 ## 입력 경로
 
-주소는 proxy mode에서 `/v1/kakao-local/geocode?q=...&limit=2`를 먼저 호출한다. 정확히 하나의 Kakao `address` 문서에서 10자리 법정동 `b_code`, `mountain_yn`, `main_address_no`, `sub_address_no`를 읽고 PNU를 만든 뒤 `/v1/building-register/title`을 호출한다. 모호한 결과, 키워드 장소 결과, 법정동 코드/본번 누락은 명시적으로 중단한다.
+주소는 proxy mode에서 `/v1/kakao-local/geocode?q=...&limit=2`를 먼저 호출한다. 정확히 하나의 Kakao `address` 문서에서 10자리 법정동 `b_code`, `mountain_yn`, `main_address_no`, `sub_address_no`를 읽고 건축물대장 API의 개별 필드로 `/v1/building-register/title`을 호출한다. 모호한 결과, 키워드 장소 결과, 법정동 코드/본번 누락은 명시적으로 중단한다.
 
 ```bash
 python3 scripts/building_register.py title --address '서울 강남구 역삼동 123-4'
-python3 scripts/building_register.py title --pnu 1168010100001230004
+python3 scripts/building_register.py title --pnu 1168010100101230004
 python3 scripts/building_register.py title \
   --sigungu-cd 11680 --bjdong-cd 10100 --plat-gb-cd 0 --bun 123 --ji 4
 ```
 
-PNU는 `sigunguCd(5) + bjdongCd(5) + platGbCd(1) + bun(4) + ji(4)`의 19자리다. `platGbCd`는 `0`, `1`, `2`만 허용한다. `bun`과 `ji`는 각각 4자리로 zero-padding되고 `ji` 생략 시 `0000`이다. `pageNo=1`, `numOfRows=10`이 기본이며 `numOfRows` 최대값은 100이다.
+PNU는 `sigunguCd(5) + bjdongCd(5) + 토지구분(1) + bun(4) + ji(4)`의 19자리다. PNU 토지구분 `1`(일반 토지)은 건축물대장 API `platGbCd=0`, `2`(산)는 `platGbCd=1`로 변환한다. 개별 입력의 `--plat-gb-cd`는 PNU 숫자가 아니라 건축물대장 API 값이다. `bun`과 `ji`는 각각 4자리로 zero-padding되고 `ji` 생략 시 `0000`이다. `pageNo=1`, `numOfRows=10`이 기본이며 `numOfRows` 최대값은 100이다.
 
 ## Hosted와 direct
 
 hosted proxy는 사용자 키가 필요 없다. route는 caller의 `serviceKey`를 거부하고 서버의 `DATA_GO_KR_API_KEY`만 upstream에 주입한다.
 
 ```bash
-python3 scripts/building_register.py title --pnu 1168010100001230004 --direct
+python3 scripts/building_register.py title --pnu 1168010100101230004 --direct
 ```
 
 direct mode는 PNU 또는 개별 코드/필지만 지원하고 주소 geocoding은 지원하지 않는다. 키 우선순위는 `KSKILL_BUILDING_REGISTER_API_KEY` -> `DATA_GO_KR_API_KEY` -> `~/.config/k-skill/secrets.env`다. `--dry-run`은 키를 `REDACTED`로 표시한다.

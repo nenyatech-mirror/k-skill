@@ -200,8 +200,10 @@ curl -fsS --get "${LOCAL_PROXY_BASE_URL}/v1/ev-charger/status" \
 
 ```bash
 curl -fsS --get "${LOCAL_PROXY_BASE_URL}/v1/building-register/title" \
-  --data-urlencode 'pnu=1168010100001230004'
+  --data-urlencode 'pnu=1168010100101230004'
 ```
+
+PNU의 11번째 자리 `1`(일반 토지)은 건축물대장 API `platGbCd=0`, `2`(산)는 `platGbCd=1`로 변환된다.
 
 의약품 안전 체크 예시 (`DATA_GO_KR_API_KEY` 필요):
 

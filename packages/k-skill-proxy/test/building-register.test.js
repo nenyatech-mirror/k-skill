@@ -30,9 +30,9 @@ const SUCCESS_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </body>
 </response>`;
 
-test("building register query parses PNU and pads explicit parcel numbers", () => {
-  assert.deepEqual(normalizeBuildingRegisterQuery({ pnu: "1168010100001230004" }), {
-    pnu: "1168010100001230004",
+test("building register query maps PNU land categories and preserves explicit API values", () => {
+  assert.deepEqual(normalizeBuildingRegisterQuery({ pnu: "1168010100101230004" }), {
+    pnu: "1168010100101230004",
     sigunguCd: "11680",
     bjdongCd: "10100",
     platGbCd: "0",
@@ -41,29 +41,30 @@ test("building register query parses PNU and pads explicit parcel numbers", () =
     pageNo: 1,
     numOfRows: 10
   });
-  assert.deepEqual(normalizeBuildingRegisterQuery({
-    sigunguCd: "11680", bjdongCd: "10100", platGbCd: "1", bun: "7", ji: "2", pageNo: "3", numOfRows: "100"
-  }), {
-    pnu: "1168010100100070002",
-    sigunguCd: "11680",
-    bjdongCd: "10100",
-    platGbCd: "1",
-    bun: "0007",
-    ji: "0002",
-    pageNo: 3,
-    numOfRows: 100
-  });
+  assert.equal(normalizeBuildingRegisterQuery({ pnu: "1168010100201230004" }).platGbCd, "1");
+
+  for (const platGbCd of ["0", "1", "2"]) {
+    const normalized = normalizeBuildingRegisterQuery({
+      sigunguCd: "11680", bjdongCd: "10100", platGbCd, bun: "7", ji: "2", pageNo: "3", numOfRows: "100"
+    });
+    assert.equal(normalized.platGbCd, platGbCd);
+    assert.equal(normalized.bun, "0007");
+    assert.equal(normalized.ji, "0002");
+    assert.equal(normalized.pnu, { 0: "1168010100100070002", 1: "1168010100200070002", 2: null }[platGbCd]);
+  }
 });
 
 test("building register query rejects conflicting, missing, malformed, and caller-key inputs", () => {
   assert.throws(() => normalizeBuildingRegisterQuery({}), /pnu|sigunguCd/i);
-  assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "1168010100001230004", sigunguCd: "11680" }), /either|같이|combine/i);
+  assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "1168010100101230004", sigunguCd: "11680" }), /either|같이|combine/i);
   assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "123" }), /19/);
+  assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "1168010100001230004" }), /pnu|land|category/i);
+  assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "1168010100301230004" }), /pnu|land|category/i);
   assert.throws(() => normalizeBuildingRegisterQuery({ sigunguCd: "11680", bjdongCd: "10100", platGbCd: "0" }), /bun/);
   assert.throws(() => normalizeBuildingRegisterQuery({ sigunguCd: "11680", bjdongCd: "10100", platGbCd: "3", bun: "1" }), /platGbCd/);
   assert.throws(() => normalizeBuildingRegisterQuery({ sigunguCd: "11680", bjdongCd: "10100", platGbCd: "0", bun: "12345" }), /bun/);
-  assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "1168010100001230004", numOfRows: "101" }), /numOfRows/);
-  assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "1168010100001230004", serviceKey: "caller-key" }), /serviceKey/);
+  assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "1168010100101230004", numOfRows: "101" }), /numOfRows/);
+  assert.throws(() => normalizeBuildingRegisterQuery({ pnu: "1168010100101230004", serviceKey: "caller-key" }), /serviceKey/);
 });
 
 test("building register XML parser handles singleton, entities, and empty items", () => {
@@ -84,7 +85,7 @@ test("building register XML parser handles singleton, entities, and empty items"
 test("building register fetch uses the exact official URL and server key", async () => {
   let seenUrl = "";
   const result = await fetchBuildingRegisterTitle({
-    params: normalizeBuildingRegisterQuery({ pnu: "1168010100001230004" }),
+    params: normalizeBuildingRegisterQuery({ pnu: "1168010100101230004" }),
     serviceKey: "server secret +/==",
     fetchImpl: async (url) => {
       seenUrl = String(url);
@@ -106,7 +107,7 @@ test("building register fetch uses the exact official URL and server key", async
 });
 
 test("building register fetch classifies missing key, HTTP auth, semantic auth, empty, and invalid XML", async () => {
-  const params = normalizeBuildingRegisterQuery({ pnu: "1168010100001230004" });
+  const params = normalizeBuildingRegisterQuery({ pnu: "1168010100101230004" });
   const missing = await fetchBuildingRegisterTitle({ params, serviceKey: null, fetchImpl: async () => assert.fail("no fetch") });
   assert.equal(missing.status_code, 503);
   assert.equal(missing.error, "upstream_not_configured");
@@ -129,7 +130,7 @@ test("building register fetch classifies missing key, HTTP auth, semantic auth, 
 });
 
 test("building register fetch classifies non-auth semantic and gateway XML as upstream errors", async () => {
-  const params = normalizeBuildingRegisterQuery({ pnu: "1168010100001230004" });
+  const params = normalizeBuildingRegisterQuery({ pnu: "1168010100101230004" });
   const responses = [
     new Response("<response><header><resultCode>99</resultCode><resultMsg>LIMITED NUMBER OF SERVICE REQUESTS EXCEEDS ERROR</resultMsg></header></response>", { status: 200 }),
     new Response("<OpenAPI_ServiceResponse><cmmMsgHeader><errMsg>SERVICE ERROR</errMsg><returnReasonCode>99</returnReasonCode></cmmMsgHeader></OpenAPI_ServiceResponse>", { status: 200 })
@@ -162,7 +163,7 @@ test("building register route validates, caches semantic successes only, and doe
   assert.equal(invalid.statusCode, 400);
   assert.equal(calls, 0);
 
-  const route = "/v1/building-register/title?pnu=1168010100001230004";
+  const route = "/v1/building-register/title?pnu=1168010100101230004";
   const first = await app.inject({ method: "GET", url: route });
   assert.equal(first.statusCode, 200);
   assert.equal(first.json().proxy.cache.hit, false);
@@ -172,7 +173,7 @@ test("building register route validates, caches semantic successes only, and doe
   assert.equal(calls, 1);
 
   mode = "auth";
-  const authRoute = "/v1/building-register/title?pnu=1168010100009990001";
+  const authRoute = "/v1/building-register/title?pnu=1168010100109990001";
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const response = await app.inject({ method: "GET", url: authRoute });
     assert.equal(response.statusCode, 502);
@@ -184,7 +185,44 @@ test("building register route validates, caches semantic successes only, and doe
 test("building register route returns 503 when DATA_GO_KR_API_KEY is missing", async (t) => {
   const app = buildServer({ env: {} });
   t.after(() => app.close());
-  const response = await app.inject({ method: "GET", url: "/v1/building-register/title?pnu=1168010100001230004" });
+  const response = await app.inject({ method: "GET", url: "/v1/building-register/title?pnu=1168010100101230004" });
   assert.equal(response.statusCode, 503);
   assert.equal(response.json().error, "upstream_not_configured");
+});
+
+test("building register route maps PNU land categories without changing explicit API values", async (t) => {
+  const originalFetch = global.fetch;
+  const upstreamUrls = [];
+  global.fetch = async (url) => {
+    upstreamUrls.push(new URL(String(url)));
+    return new Response(
+      "<response><header><resultCode>00</resultCode></header><body><items></items><numOfRows>10</numOfRows><pageNo>1</pageNo><totalCount>0</totalCount></body></response>",
+      { status: 200, headers: { "content-type": "application/xml" } }
+    );
+  };
+  const app = buildServer({ env: { DATA_GO_KR_API_KEY: "server-key" } });
+  t.after(async () => {
+    global.fetch = originalFetch;
+    await app.close();
+  });
+
+  const normal = await app.inject({ method: "GET", url: "/v1/building-register/title?pnu=1168010100101230004" });
+  const mountain = await app.inject({ method: "GET", url: "/v1/building-register/title?pnu=1168010100201230004" });
+  assert.equal(normal.statusCode, 200);
+  assert.equal(mountain.statusCode, 200);
+  assert.equal(upstreamUrls[0].searchParams.get("platGbCd"), "0");
+  assert.equal(upstreamUrls[1].searchParams.get("platGbCd"), "1");
+
+  const invalid = await app.inject({ method: "GET", url: "/v1/building-register/title?pnu=1168010100001230004" });
+  assert.equal(invalid.statusCode, 400);
+  assert.equal(upstreamUrls.length, 2);
+
+  for (const platGbCd of ["0", "1", "2"]) {
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/building-register/title?sigunguCd=11680&bjdongCd=10100&platGbCd=${platGbCd}&bun=${platGbCd}7`
+    });
+    assert.equal(response.statusCode, 200);
+    assert.equal(upstreamUrls.at(-1).searchParams.get("platGbCd"), platGbCd);
+  }
 });

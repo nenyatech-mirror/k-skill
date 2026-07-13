@@ -1,5 +1,7 @@
 const BUILDING_REGISTER_URL = "https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo";
 const AUTH_RESULT_CODES = new Set(["20", "21", "22", "30", "31", "32", "33"]);
+const PNU_LAND_CATEGORY_TO_PLAT_GB_CD = { 1: "0", 2: "1" };
+const PLAT_GB_CD_TO_PNU_LAND_CATEGORY = { 0: "1", 1: "2" };
 
 function trimOrNull(value) {
   if (value === undefined || value === null) return null;
@@ -61,10 +63,11 @@ function normalizeBuildingRegisterQuery(query = {}) {
     pnu = exactDigits(rawPnu, 19, "pnu");
     sigunguCd = pnu.slice(0, 5);
     bjdongCd = pnu.slice(5, 10);
-    platGbCd = pnu.slice(10, 11);
+    const landCategory = pnu.slice(10, 11);
+    platGbCd = PNU_LAND_CATEGORY_TO_PLAT_GB_CD[landCategory];
     bun = pnu.slice(11, 15);
     ji = pnu.slice(15, 19);
-    if (!new Set(["0", "1", "2"]).has(platGbCd)) throw new Error("pnu contains an invalid platGbCd.");
+    if (platGbCd === undefined) throw new Error("pnu land category must be 1 or 2.");
   } else {
     if (!hasExplicit) throw new Error("Provide pnu or sigunguCd, bjdongCd, platGbCd, and bun.");
     sigunguCd = exactDigits(query.sigunguCd, 5, "sigunguCd");
@@ -73,7 +76,8 @@ function normalizeBuildingRegisterQuery(query = {}) {
     if (!new Set(["0", "1", "2"]).has(platGbCd)) throw new Error("platGbCd must be 0, 1, or 2.");
     bun = parcelDigits(query.bun, "bun", { required: true });
     ji = parcelDigits(query.ji, "ji");
-    pnu = `${sigunguCd}${bjdongCd}${platGbCd}${bun}${ji}`;
+    const landCategory = PLAT_GB_CD_TO_PNU_LAND_CATEGORY[platGbCd];
+    pnu = landCategory === undefined ? null : `${sigunguCd}${bjdongCd}${landCategory}${bun}${ji}`;
   }
 
   return {
