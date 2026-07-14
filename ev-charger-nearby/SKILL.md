@@ -34,16 +34,16 @@ python3 scripts/ev_charger.py status --stat-id ME000001 --num-of-rows 10
 python3 scripts/ev_charger.py status --zcode 11 --limit-yn Y --period 10 --json
 ```
 
-공통 필터는 `zcode`, `zscode`, `statId`, `chgerId`다. `info`는 `location`, `status`는 `limitYn`과 `period`를 추가로 허용한다. 페이지 기본값은 `pageNo=1`, `numOfRows=10`이며 한 번에 최대 100건이다.
+공통 필터는 `zcode`, `zscode`, `statId`, `chgerId`다. hosted proxy의 `info`는 고유하게 식별되는 `location`을 행정구역 코드로 변환하며, 모호하거나 찾을 수 없는 위치와 충돌하는 명시적 코드는 거부한다. `status`는 `limitYn`과 `period`를 추가로 허용한다. 페이지 기본값은 `pageNo=1`, `numOfRows=10`이며 `numOfRows` 범위는 10~9999다.
 
 직접 호출:
 
 ```bash
-python3 scripts/ev_charger.py info --location '서울' --direct
+python3 scripts/ev_charger.py info --zcode 11 --zscode 11680 --direct
 python3 scripts/ev_charger.py status --stat-id ME000001 --direct --dry-run
 ```
 
-`--dry-run`은 URL을 보여주되 키를 `REDACTED`로 가린다.
+직접 호출은 위치 텍스트를 행정구역 코드로 변환하지 않으므로 `--location` 대신 `--zcode`/`--zscode`를 사용한다. `--dry-run`은 URL을 보여주되 키를 `REDACTED`로 가린다.
 
 ## Credential rules
 

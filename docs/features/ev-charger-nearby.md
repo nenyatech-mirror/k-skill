@@ -26,25 +26,25 @@ python3 ev-charger-nearby/scripts/ev_charger.py status --zcode 11 --limit-yn Y -
 
 ```bash
 export KSKILL_EV_CHARGER_API_KEY=your-key
-python3 ev-charger-nearby/scripts/ev_charger.py info --location '서울' --direct
+python3 ev-charger-nearby/scripts/ev_charger.py info --zcode 11 --zscode 11680 --direct
 python3 ev-charger-nearby/scripts/ev_charger.py status --stat-id ME000001 --direct --dry-run
 ```
 
-`--dry-run` 출력에는 실제 키가 나오지 않는다.
+hosted proxy는 고유한 `location`을 `zcode`/`zscode`로 변환하고, 모호하거나 찾을 수 없는 위치와 충돌하는 명시적 코드를 거부한다. 직접 호출은 위치 텍스트 변환을 지원하지 않으므로 `--zcode`/`--zscode`를 사용한다. `--dry-run` 출력에는 실제 키가 나오지 않는다.
 
 ## 허용 입력
 
 | 입력 | 적용 | 제한 |
 | --- | --- | --- |
 | `pageNo` | 공통 | 기본 1, 양의 정수 |
-| `numOfRows` | 공통 | 기본 10, 최대 100 |
+| `numOfRows` | 공통 | 기본 10, 10~9999 |
 | `zcode` | 공통 | 2자리 시도 코드 |
 | `zscode` | 공통 | 5자리 시군구 코드 |
 | `statId` | 공통 | 충전소 ID, 최대 40자 |
 | `chgerId` | 공통 | 충전기 ID, 최대 10자 |
-| `location` | info | 위치 설명, 최대 100자 |
+| `location` | proxy info | 고유한 행정구역 위치, 최대 100자 |
 | `limitYn` | status | `Y` 또는 `N` |
-| `period` | status | 1~1440 정수 |
+| `period` | status | 1~10 정수 |
 
 caller가 보낸 `serviceKey`와 `dataType`은 거부한다. 프록시가 서버 키와 `dataType=JSON`을 강제한다.
 

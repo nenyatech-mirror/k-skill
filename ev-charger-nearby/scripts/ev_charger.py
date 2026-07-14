@@ -51,9 +51,9 @@ def resolve_api_key(args: argparse.Namespace) -> Optional[str]:
     return value.strip() if value and value.strip() else None
 
 
-def _bounded_integer(value: int, label: str, maximum: int) -> int:
-    if value < 1 or value > maximum:
-        raise HelperError(f"{label} 값은 1~{maximum} 범위여야 합니다.")
+def _bounded_integer(value: int, label: str, minimum: int, maximum: int) -> int:
+    if value < minimum or value > maximum:
+        raise HelperError(f"{label} 값은 {minimum}~{maximum} 범위여야 합니다.")
     return value
 
 
@@ -72,8 +72,8 @@ def _validate_code(value: Optional[str], label: str, maximum: int, digits: Optio
 
 def build_query(args: argparse.Namespace) -> Dict[str, Any]:
     query: Dict[str, Any] = {
-        "pageNo": _bounded_integer(args.page_no, "pageNo", 100000),
-        "numOfRows": _bounded_integer(args.num_of_rows, "numOfRows", 100),
+        "pageNo": _bounded_integer(args.page_no, "pageNo", 1, 100000),
+        "numOfRows": _bounded_integer(args.num_of_rows, "numOfRows", 10, 9999),
     }
     for key, maximum, digits in (("zcode", 2, 2), ("zscode", 5, 5), ("stat_id", 40, None), ("chger_id", 10, None)):
         value = _validate_code(getattr(args, key), key.replace("_", ""), maximum, digits)
@@ -83,6 +83,8 @@ def build_query(args: argparse.Namespace) -> Dict[str, Any]:
         location = args.location.strip()
         if len(location) > 100:
             raise HelperError("location 값은 100자 이하여야 합니다.")
+        if args.direct:
+            raise HelperError("--direct에서는 location을 지원하지 않습니다. --zcode와 --zscode를 사용하세요.")
         query["location"] = location
     if args.command == "status":
         if args.limit_yn:
@@ -91,7 +93,7 @@ def build_query(args: argparse.Namespace) -> Dict[str, Any]:
                 raise HelperError("limitYn 값은 Y 또는 N이어야 합니다.")
             query["limitYn"] = limit_yn
         if args.period is not None:
-            query["period"] = _bounded_integer(args.period, "period", 1440)
+            query["period"] = _bounded_integer(args.period, "period", 1, 10)
     return query
 
 

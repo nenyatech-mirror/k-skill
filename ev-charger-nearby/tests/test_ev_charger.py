@@ -36,6 +36,30 @@ class EvChargerHelperTests(unittest.TestCase):
         self.assertEqual(params["dataType"], ["JSON"])
         self.assertTrue(parsed.path.endswith("/getChargerStatus"))
 
+    def test_direct_location_is_rejected_and_proxy_location_is_preserved(self):
+        proxy_args = ev_charger.parse_args(["info", "--location", "서울 강남구"])
+        self.assertEqual(ev_charger.build_query(proxy_args)["location"], "서울 강남구")
+
+        direct_args = ev_charger.parse_args(["info", "--location", "서울 강남구", "--direct"])
+        with self.assertRaisesRegex(ev_charger.HelperError, "zcode.*zscode"):
+            ev_charger.build_query(direct_args)
+
+    def test_pagination_and_period_follow_upstream_bounds(self):
+        for value in (10, 9999):
+            args = ev_charger.parse_args(["info", "--num-of-rows", str(value)])
+            self.assertEqual(ev_charger.build_query(args)["numOfRows"], value)
+        for value in (3, 10000):
+            args = ev_charger.parse_args(["info", "--num-of-rows", str(value)])
+            with self.assertRaisesRegex(ev_charger.HelperError, "numOfRows"):
+                ev_charger.build_query(args)
+
+        for value in (1, 10):
+            args = ev_charger.parse_args(["status", "--period", str(value)])
+            self.assertEqual(ev_charger.build_query(args)["period"], value)
+        args = ev_charger.parse_args(["status", "--period", "11"])
+        with self.assertRaisesRegex(ev_charger.HelperError, "period"):
+            ev_charger.build_query(args)
+
     def test_direct_missing_key_reports_dataset_specific_action(self):
         stderr = io.StringIO()
         with mock.patch.dict(os.environ, {}, clear=True), contextlib.redirect_stderr(stderr):

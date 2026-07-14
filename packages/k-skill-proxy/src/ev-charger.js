@@ -1,3 +1,5 @@
+const { searchRegionCode } = require("./region-lookup");
+
 const EV_CHARGER_BASE_URL = "https://apis.data.go.kr/B552584/EvCharger";
 const EV_CHARGER_OPERATIONS = Object.freeze({
   info: "getChargerInfo",
@@ -11,12 +13,12 @@ function trimOrNull(value) {
   return text || null;
 }
 
-function parseInteger(value, { defaultValue, max, label }) {
+function parseInteger(value, { defaultValue, min = 1, max, label }) {
   const text = trimOrNull(value);
   if (text === null) return defaultValue;
   if (!/^\d+$/.test(text)) throw new Error(`${label} must be an integer.`);
   const parsed = Number.parseInt(text, 10);
-  if (parsed < 1 || parsed > max) throw new Error(`${label} must be between 1 and ${max}.`);
+  if (parsed < min || parsed > max) throw new Error(`${label} must be between ${min} and ${max}.`);
   return parsed;
 }
 
@@ -57,7 +59,12 @@ function normalizeEvChargerQuery(operation, query = {}) {
     operation,
     upstreamOperation,
     pageNo: parseInteger(query.pageNo ?? query.page, { defaultValue: 1, max: 100000, label: "pageNo" }),
-    numOfRows: parseInteger(query.numOfRows ?? query.limit, { defaultValue: 10, max: 100, label: "numOfRows" })
+    numOfRows: parseInteger(query.numOfRows ?? query.limit, {
+      defaultValue: 10,
+      min: 10,
+      max: 9999,
+      label: "numOfRows"
+    })
   };
   const filters = {
     zcode: validateCode(query.zcode, { label: "zcode", pattern: /^\d{2}$/, maxLength: 2 }),
@@ -71,7 +78,22 @@ function normalizeEvChargerQuery(operation, query = {}) {
 
   if (operation === "info") {
     const location = validateText(query.location, { label: "location", maxLength: 100 });
-    if (location !== null) normalized.location = location;
+    if (location !== null) {
+      const matches = searchRegionCode(location);
+      if (matches.length === 0) throw new Error("location must resolve to a supported region.");
+      if (matches.length > 1) throw new Error("location must resolve to exactly one region.");
+
+      const zscode = matches[0].lawd_cd;
+      const zcode = zscode.slice(0, 2);
+      if (normalized.zcode !== undefined && normalized.zcode !== zcode) {
+        throw new Error("location conflicts with zcode.");
+      }
+      if (normalized.zscode !== undefined && normalized.zscode !== zscode) {
+        throw new Error("location conflicts with zscode.");
+      }
+      normalized.zcode = zcode;
+      normalized.zscode = zscode;
+    }
   } else {
     const limitYn = trimOrNull(query.limitYn);
     if (limitYn !== null) {
@@ -80,7 +102,7 @@ function normalizeEvChargerQuery(operation, query = {}) {
       normalized.limitYn = upper;
     }
     if (trimOrNull(query.period) !== null) {
-      normalized.period = parseInteger(query.period, { defaultValue: 10, max: 1440, label: "period" });
+      normalized.period = parseInteger(query.period, { defaultValue: 10, max: 10, label: "period" });
     }
   }
   return normalized;
@@ -148,7 +170,7 @@ async function fetchEvCharger({ params, serviceKey, fetchImpl = global.fetch }) 
   url.searchParams.set("serviceKey", serviceKey);
   url.searchParams.set("dataType", "JSON");
   for (const [key, value] of Object.entries(params)) {
-    if (key === "operation" || key === "upstreamOperation") continue;
+    if (key === "operation" || key === "upstreamOperation" || key === "location") continue;
     url.searchParams.set(key, String(value));
   }
 
