@@ -1,32 +1,34 @@
 # 공무국외출장 보고서 조회 가이드
 
-`gov-overseas-trip-report`는 중앙선거관리위원회 공식 홈페이지의 공무국외출장보고서 게시판을 read-only로 조회해 제목, 등록일, 상세 URL, 첨부 원문 URL을 정리하고 PDF/HWP/HWPX 첨부에서 확인 가능한 출장 정보, 공개·미공개 항목, 산술 지표, 원문 인용 기반 검토 신호를 구조화하는 SKILL.md 중심 스킬이다.
+`gov-overseas-trip-report`는 선관위 보드를 고해상도 축으로 두고, 권익위·정보공개포털·대구/대전/경기/경북 의회·인사혁신처/행안부 제도 안내·BTIS 상태 probe까지 검증된 공개 표면 10개를 묶는 스킬이다. 목록/상세/첨부 URL을 수집하고 PDF/HWP/HWPX는 kordoc으로 사실·공개성·검토 신호만 구조화한다. 부정부패 탐지 도구가 아니다.
 
 > 참고용 요약입니다. 문서에 없는 정보는 추정하지 않으며, 중요한 판단은 반드시 공식 원문을 직접 확인해야 합니다.
 
 ## 목적
 
-공무국외출장 보고서가 공식 홈페이지에 공개되어 있어도 게시판과 첨부 파일로 흩어져 있어 찾기 어렵다. 이 스킬은 1차 범위를 선관위 게시판으로 좁혀 공식 공개 표면에서 확인 가능한 사실만 구조화한다.
+공무국외출장 자료는 기관별 게시판·사전정보공개·정보공개포털에 흩어져 있다. 이 스킬은 live 검증된 10개 공개 표면만 허용하고, helper CLI로 목록/상세를 모은 뒤 원문 근거가 있는 범위만 요약한다.
 
 ## 사용 상황
 
-- 선관위 공무국외출장 보고서 목록을 공식 출처 기준으로 찾을 때
-- 국가명, 기간, 키워드로 후보 보고서를 좁힐 때
-- 게시글 상세 URL과 첨부 원문 URL을 함께 남겨야 할 때
-- PDF/HWP/HWPX 첨부가 있는 경우 기존 `hwp` 스킬의 kordoc 절차로 텍스트 추출을 시도해야 할 때
-- 문서에 공개된 목적, 일정, 방문기관, 출장자 역할, 비용, 좌석등급 정보를 사실·산술·미기재·검토 신호로 분리해 보고 싶을 때
-- 공개 보고서만으로 추가 확인이 필요한 정보공개청구 대상 문서를 추리고 싶을 때
+- 선관위뿐 아니라 권익위/지방의회/정보공개포털에서 국외출장 자료를 찾을 때
+- 기관·키워드·국가명으로 후보를 모을 때
+- 상세 URL과 첨부 원문 URL을 남겨야 할 때
+- PDF/HWP/HWPX를 kordoc으로 열어 사실·공개성·검토 신호만 분리할 때
+- BTIS 로그인 벽 여부를 확인하고 공개 보드로 폴백해야 할 때
 
 ## 입력 예시
 
 ```text
-기관: 선관위
-기간: 2026년 1월부터 3월
-키워드: 재외선거
-국가명: 캐나다
+기관/provider: nec | acrc | open_portal | daegu_council | daejeon_council | gyeonggi_council | gyeongbuk_council
+키워드: 몰디브
 ```
 
-1차 범위에서는 `중앙선거관리위원회` 또는 `선관위`만 허용한다. 다른 기관은 BTIS/data.go.kr/타 부처 확장 이슈로 분리한다.
+```bash
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py list --provider nec --max-pages 5
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py search --keyword 몰디브
+```
+
+표에 없는 기관은 unsupported. open_portal 메타검색만 보조로 제안한다.
 
 ## 출력 예시
 
@@ -172,16 +174,16 @@
 }
 ```
 
-## 1차 스코프
+## 1차 스코프 (10 providers)
 
-- 대상 기관: 중앙선거관리위원회
-- 대상 게시판: `https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107`
-- 목록 페이지: 제목, 등록일, 상세 URL, 첨부 다운로드 URL 확인
-- 상세 페이지: 본문 설명, 첨부 블록, 빠른보기 iframe 메타데이터 확인
-- PDF/HWP/HWPX: 기존 `hwp` 스킬의 kordoc 절차로 텍스트 추출 시도
-- PDF: `pdfjs-dist`를 함께 지정해 `kordoc --format json`으로 Markdown과 구조 정보를 추출
-- HTTP fallback: 직접 HTTP가 timeout/partial response를 내면 차단으로 단정하지 않고 `k-skill-browser-runtime` 또는 Aside Browser로 `a[href*="View.do"]`, `a[href*="Download.do"]`, `span.date`를 확인
-- 투명성 점검: 사실, 산술, 공개·미공개 항목, 원문 인용 기반 검토 신호, 정보공개청구 추천 문서를 분리해 표시
+- `nec` GET `pageIndex` 목록/상세/PDF — **POST pageIndex 금지**
+- `acrc` nPage 목록 + boardDownload 첨부
+- `open_portal` mustKeyword JSON 메타
+- `daegu_council` / `daejeon_council` / `gyeonggi_council` / `gyeongbuk_council` 의회 공개 보드
+- `mpm` / `mois` 제도·처리기준 안내
+- `btis` login wall probe only
+- 첨부 원문: kordoc 추출 + 공개성 4층 요약
+- HTTP timeout 시 Aside/`k-skill-browser-runtime` fallback (nec 등)
 
 ## 데이터 출처
 
@@ -194,13 +196,13 @@
 - 제공 형식: 서버 렌더 HTML 게시글 + 첨부 PDF/HWP/HWPX 등
 - 접근 방식: read-only 직접 조회
 
-2026-07-08 실측 기준으로 전체 5페이지 62건의 목록과 62개 첨부 URL 접근이 가능했다. 목록 첨부는 모두 PDF였고, 최신 게시글 `bcIdx=303199`의 PDF 첨부는 `kordoc --format json`에서 `success: true`, `fileType: "pdf"`, Markdown 48,086자로 추출되었다. 2026-07-14 리뷰 실측에서는 직접 HTTP가 목록/PDF 다운로드에서 timeout 또는 partial response를 낼 수 있지만, Aside Browser에서는 목록 62건/5페이지와 상세·첨부 링크가 정상 노출되는 경로가 확인되었다.
+2026-07-14 live: nec GET pageIndex 1..5 = 62 unique / attachments 62 PDF; acrc list 20; open_portal keyword hits; daegu·daejeon·ggc·gyeongbuk boards parseable; btis login_required; POST pageIndex on nec returns error page. kordoc on nec `bcIdx=303199` and Maldives samples remains valid.
 
 ## 사용 절차
 
-1. 기관명이 `중앙선거관리위원회` 또는 `선관위`인지 확인한다.
-2. 목록 URL을 조회한다.
-3. 추가 페이지가 필요하면 요청 간 약 2초 지연을 두고 `pageIndex`로 이동한다.
+1. provider 표에 기관을 매핑한다.
+2. helper `list`/`search`로 목록을 조회한다.
+3. nec 추가 페이지는 GET `pageIndex`만 사용하고 요청 간 약 2초 지연을 둔다.
 4. 제목, 등록일, 상세 URL, 첨부 URL을 추출한다.
 5. 사용자의 기간, 키워드, 국가명 조건으로 후보를 좁힌다.
 6. 상세 페이지를 열어 본문과 첨부 정보를 재확인한다.
@@ -214,7 +216,7 @@
 
 직접 HTTP에서 목록 HTML이 일부 수신된 뒤 30초 안에 끝나지 않거나, 첨부 다운로드가 일부 바이트만 받은 뒤 120초 안에 완료되지 않으면 `http timeout or partial response`로 본다. 이 경우를 차단으로 단정하지 말고 Aside Browser 또는 `k-skill-browser-runtime`으로 같은 공식 URL을 연다.
 
-브라우저 fallback에서는 상세 링크를 `a[href*="View.do"][href*="cbIdx=1107"]`, 첨부 링크를 `a[href*="Download.do"][href*="cbIdx=1107"]`, 등록일을 `span.date`에서 우선 추출한다. 페이지 이동은 `pageIndex` 증가 또는 페이지네이션 클릭으로 수행하고, 새 `bcIdx`가 없거나 이미 본 `bcIdx`만 나오거나 다음 링크가 없거나 5페이지를 확인하면 종료한다.
+브라우저 fallback에서는 상세 링크를 `a[href*="View.do"][href*="cbIdx=1107"]`, 첨부 링크를 `a[href*="Download.do"][href*="cbIdx=1107"]`, 등록일을 `span.date`에서 우선 추출한다. 페이지 이동은 GET `pageIndex` 증가 또는 페이지네이션 클릭으로 수행하고, 새 `bcIdx`가 없거나 이미 본 `bcIdx`만 나오거나 다음 링크가 없거나 5페이지를 확인하면 종료한다.
 
 로그인 폼, CAPTCHA, 점검 문구, 공식 경로 밖 리다이렉트가 확인될 때만 차단/점검 실패로 보고한다.
 
@@ -326,7 +328,9 @@ npx kordoc /tmp/report.pdf --format json
 
 ## 후속 확장 계획
 
-- BTIS 및 data.go.kr 기반 부처 횡단 조회
+- 추가 광역의회/중앙부처 공개 보드 inventory
+- open.go.kr 원문 deep-link 안정화
+- BTIS 공개 API가 생길 때만 정식 연동
 - 이미지 기반 PDF/OCR fallback은 별도 이슈에서 비용과 안전성을 검토
 - HWP/HWPX 첨부가 있는 실제 선관위 샘플이 생기면 같은 `kordoc` 경로로 추가 실측
 - 예산 항목이 있는 보고서에 대한 비용 요약

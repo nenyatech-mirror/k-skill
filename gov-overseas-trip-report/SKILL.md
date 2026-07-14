@@ -1,6 +1,6 @@
 ---
 name: gov-overseas-trip-report
-description: 중앙선거관리위원회 공식 공무국외출장보고서 게시판을 조회해 보고서 목록, 상세 URL, 첨부 원문 URL, 문서에서 확인 가능한 출장 정보, 공개·미공개 항목, 산술 지표, 원문 인용 기반 검토 신호를 참고용으로 구조화한다.
+description: 선관위·권익위·정보공개포털·주요 지방의회 등 검증된 공개 표면에서 공무국외출장/국외훈련 보고서·현황을 조회하고, 첨부 원문이 있으면 kordoc으로 사실·공개성·검토 신호만 구조화한다. 부정부패 판정 도구가 아니다.
 license: MIT
 metadata:
   category: civic
@@ -12,62 +12,117 @@ metadata:
 
 ## What this skill does
 
-중앙선거관리위원회 공식 홈페이지의 공무국외출장보고서 게시판을 read-only로 조회하고, 게시글 제목·등록일·상세 URL·첨부 원문 URL을 확인한다. 첨부가 PDF/HWP/HWPX이면 기존 `hwp` 스킬의 `kordoc` 절차로 텍스트 추출을 시도하고, 문서에서 확인되는 범위만 구조화한다. 문서에 비용, 항공권, 좌석등급, 숙박비, 일비 정보가 있으면 세금낭비 판정이 아니라 사실, 산술, 미기재, 원문 인용 기반 검토 신호로 분리해 표시한다.
+검증된 공공 공개 표면에서 공무국외출장·국외훈련 관련 목록/상세/첨부 URL을 read-only로 조회한다. 1차 고해상도 표면은 중앙선거관리위원회 공무국외출장보고서 게시판이다. 여기에 국민권익위원회 국외출장 현황, 정보공개포털 메타검색, 대구·대전·경기·경북 의회 공개 보드, 인사혁신처·행안부 제도 안내, BTIS 로그인 벽 상태를 같은 스킬 계약으로 묶는다.
 
-이 스킬은 참고용 요약 도구다. 문서에 없는 정보는 추정하지 않고 `문서에서 확인 불가` 또는 `기재되어 있지 않음`으로 표시한다. 중요한 판단은 반드시 공식 원문을 직접 확인해야 한다.
+첨부가 PDF/HWP/HWPX이면 기존 `hwp` 스킬의 `kordoc` 절차로 텍스트를 추출하고, 문서에서 확인되는 범위만 `facts` / `arithmetic` / `disclosure` / `reviewSignals` 로 분리한다. 세금낭비·부정·위법 여부를 단정하지 않는다.
 
 ## When to use
 
-- 사용자가 선관위 또는 중앙선거관리위원회 공무국외출장보고서를 찾아 달라고 할 때
-- 기관명, 기간, 키워드, 국가명으로 선관위 공무국외출장 보고서 후보를 좁히고 싶을 때
-- 공식 게시글 URL과 첨부 원문 URL을 함께 남긴 참고용 요약이 필요할 때
+- 선관위 또는 다른 공개 기관의 공무국외출장/국외훈련 보고서를 찾을 때
+- 기관명·키워드·국가명으로 후보 목록을 모을 때
+- 공식 게시글 URL과 첨부 원문 URL을 남긴 참고용 요약이 필요할 때
+- BTIS에 전 부처 데이터가 있는지 먼저 확인하되, 로그인 벽이면 공개 보드로 폴백해야 할 때
 
 ## Scope
 
-1차 범위는 중앙선거관리위원회/선관위로 한정한다. 다른 기관명이 들어오면 이번 스코프 밖이라고 답하고, 선관위 조회만 수행할 수 있다고 안내한다.
+지원 provider 10개(2026-07-14 live 검증):
+
+| id | 기관 | 표면 | list | 첨부 원문 |
+|---|---|---|---|---|
+| `nec` | 중앙선거관리위원회 | 공무국외출장보고서 보드 | yes | PDF |
+| `acrc` | 국민권익위원회 | 국외출장 현황 사전정보공개 | yes | HWPX |
+| `open_portal` | 정보공개포털 | 다기관 문서 메타검색 | yes | rarely direct |
+| `daegu_council` | 대구광역시의회 | 공무국외출장 보드 | yes | PDF |
+| `daejeon_council` | 대전광역시의회 | 계획·결과 보고서 보드 | yes | mixed |
+| `gyeonggi_council` | 경기도의회 | 국외훈련결과보고서 | yes | file uuid |
+| `gyeongbuk_council` | 경상북도의회 | 공지 중 출장계획 공개 | yes | hwp/pdf |
+| `mpm` | 인사혁신처 | 공무국외출장 제도 안내 | no | policy |
+| `mois` | 행정안전부 | 위법 출장 처리기준 예규 | no | policy file |
+| `btis` | BTIS | 국외출장연수정보시스템 | no | login wall |
+
+표에 없는 기관은 `unsupported institution`으로 보고하고, `open_portal` 키워드 검색 또는 정보공개청구 경로만 안내한다. 추측으로 새 도메인을 크롤하지 않는다.
+
+## Helper CLI
+
+우선 저장소 helper를 사용한다.
+
+```bash
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py providers
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py list --provider nec --max-pages 5
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py list --provider acrc --max-pages 2
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py list --provider open_portal --keyword 국외출장
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py list --provider daegu_council
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py list --provider daejeon_council
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py list --provider gyeonggi_council
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py list --provider gyeongbuk_council --keyword 국외출장
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py detail --provider nec --id 303199
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py detail --provider btis
+python3 gov-overseas-trip-report/scripts/gov_overseas_trip_report.py search --keyword 몰디브 --providers nec,acrc,open_portal,daejeon_council
+```
 
 ## Official access path
 
-허용된 공식 표면만 사용한다.
+### nec (선관위) — high resolution
 
-- 목록: `https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107`
-- 페이지 이동: 같은 목록 경로에 `pageIndex=<number>`를 POST. 예: `curl -X POST 'https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107' --data 'pageIndex=2&bcIdx=&mode='`
-- 상세: `https://www.nec.go.kr/site/nec/ex/bbs/View.do?cbIdx=1107&bcIdx=<게시글ID>`
-- 첨부 다운로드: `https://www.nec.go.kr/common/board/Download.do?bcIdx=<게시글ID>&cbIdx=1107&streFileNm=<서버파일명>`
+- 목록 GET만 사용: `https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107&pageIndex=<n>`
+- **POST `pageIndex` 는 실패한다.** `curl -X POST ... --data 'pageIndex=2&bcIdx=&mode='` 는 `오류가 발생했습니다.` 페이지를 반환한다. 성공 경로로 쓰지 말 것.
+- 상세: `https://www.nec.go.kr/site/nec/ex/bbs/View.do?cbIdx=1107&bcIdx=<id>`
+- 첨부: `https://www.nec.go.kr/common/board/Download.do?bcIdx=<id>&cbIdx=1107&streFileNm=<file>`
+- HTML entity(`&` → `&`)를 풀어 절대 URL로 정규화한 뒤 다운로드한다.
+- 2026-07-14 live: GET page 1..5 → 유니크 62건, 첨부 62/62 PDF.
 
-실측 기준 게시판은 서버 렌더 HTML이며 로그인 없이 접근 가능하다. 목록 HTML에는 `View.do?cbIdx=1107&bcIdx=...`, `Download.do?...`, `span.date`가 노출된다.
+### acrc (권익위)
 
-2026-07-08 실측에서는 총 62건, 5페이지가 확인되었고 목록에 노출된 62개 첨부가 모두 PDF였다. 최신 게시글 `bcIdx=303199`의 PDF 첨부는 `kordoc --format json`으로 파싱 성공(`success: true`, `fileType: "pdf"`, Markdown 48,086자)했으며, 출장기간·출장국가/방문기관·출장목적·출장자·주요일정 표가 추출되었다. 2026-07-14 리뷰 실측에서는 직접 HTTP가 일부 응답 후 timeout/partial response를 낼 수 있지만, Aside Browser에서는 목록 62건/5페이지와 상세·첨부 링크가 정상 노출되는 경로가 확인되었다. 향후 HWP/HWPX 첨부가 나타나면 같은 `kordoc` 절차를 사용한다.
+- 목록: `https://www.acrc.go.kr/board.es?mid=a10502060000&bid=1000&nPage=<n>`
+- 상세: 같은 경로 `act=view&list_no=<id>`
+- 첨부: `https://www.acrc.go.kr/boardDownload.es?bid=1000&list_no=<id>&seq=1`
+
+### open_portal
+
+- `https://www.open.go.kr/othicInfo/infoList/infoList.do?mustKeyword=<keyword>`
+- 응답 HTML의 `var result = {...}` JSON(`rtnList`)을 파싱한다. 다수 교육청·지자체 문서 메타.
+
+### daegu_council / daejeon_council / gyeonggi_council / gyeongbuk_council
+
+- 대구: `https://council.daegu.go.kr/kr/bbs?bbs_id=overseas&page=<n>` (단따옴표 href)
+- 대전: `https://council.daejeon.go.kr/svc/inf/TrainingReportList.do?pageNo=<n>`
+- 경기: `https://www.ggc.go.kr/site/main/board/training_resrep/list`
+- 경북: `https://council.gb.go.kr/kr/bbs?bbs_id=notice` 제목에 `출장` 포함 글만
+
+### mpm / mois / btis
+
+- 인사혁신처 제도 안내, 행안부 처리기준 예규, BTIS 로그인 벽 probe만 수행.
+- BTIS는 공개 bulk list 가 아니며 `login_required` 로 보고한다.
 
 ## Inputs
 
-- `institution`: 필수. `중앙선거관리위원회` 또는 `선관위`만 허용
-- `period`: 선택. 등록일 또는 제목에서 확인 가능한 기간 필터
-- `keyword`: 선택. 제목/상세 본문/첨부 파일명 필터
-- `country`: 선택. 제목/본문/파일명에서 국가명 필터
-
-사용자 입력 URL을 그대로 fetch하지 않는다. 사용자가 URL을 주더라도 `www.nec.go.kr`의 위 허용 경로인지 검증한 경우에만 접근한다.
+- `provider` / 기관명: 위 표 id 또는 기관 한글명
+- `keyword`, `country`, `period`: 선택 필터
+- `page` / `max_pages`: 목록 페이지
+- 사용자 임의 URL은 allowlisted host+path 검증 후에만 fetch
 
 ## Workflow
 
-1. 기관명을 확인한다. `중앙선거관리위원회` 또는 `선관위`가 아니면 1차 범위 밖이라고 보고하고 중단한다.
-2. 목록 URL을 조회한다. 추가 페이지가 필요하면 요청 사이 약 2초를 두고 `pageIndex`로 이동한다.
-3. 각 행에서 제목, 등록일, 상세 URL, 첨부 다운로드 URL, 첨부 파일명을 추출한다.
-4. 기간, 키워드, 국가명 조건이 있으면 제목/등록일/파일명과 상세 본문에서 확인 가능한 텍스트만 기준으로 좁힌다.
-5. 상세 페이지를 조회해 제목, 등록일, 본문 설명, 첨부 블록을 재확인한다.
-6. 첨부가 PDF/HWP/HWPX이면 임시 디렉터리에만 다운로드한다. 레포 안에 저장하지 않는다.
-7. PDF/HWP/HWPX는 기존 `hwp` 스킬의 `kordoc` 절차를 사용한다. PDF 처리를 위해 `pdfjs-dist`를 함께 지정한다.
+1. 요청 기관을 provider 표에 매핑한다. 미지원이면 `unsupported institution` + `open_portal` 검색 제안.
+2. 가능하면 helper CLI `list/detail/search` 를 먼저 실행한다.
+3. nec 목록은 **GET `pageIndex`** 로만 순회한다. POST pageIndex 금지.
+4. 각 행에서 제목, 등록일/식별자, 상세 URL, 첨부 URL을 추출하고 HTML entity를 decode한다.
+5. 기간·키워드·국가 조건이 있으면 확인 가능한 텍스트만으로 필터한다.
+6. 상세 페이지를 조회해 본문/첨부 블록을 재확인한다.
+7. 첨부가 PDF/HWP/HWPX이면 임시 디렉터리에만 다운로드한다. 레포 안에 저장하지 않는다.
+8. PDF/HWP/HWPX는 기존 `hwp` 스킬의 `kordoc` 절차를 사용한다. PDF 처리를 위해 `pdfjs-dist`를 함께 지정한다.
 
 ```bash
 npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format json
 ```
 
-8. `kordoc` 결과에서 제목, 국가, 기간, 목적, 일정, 출장자, 요약을 문서 근거가 있는 범위에서만 구조화한다.
-9. 비용·일정 관련 텍스트가 있으면 `arithmetic`, `disclosure`, `reviewSignals`, `recommendedDisclosureRequests`, `safeStatements`를 생성한다. 원문에 있는 목적, 방문기관, 일정, 출장자 역할, 비용, 좌석등급, 숙박비, 일비, 결과 활용계획만 사용하고, 시장가나 항공권 현재가를 임의로 조회하지 않는다.
-10. `success: false`, 빈 Markdown, 낮은 페이지 품질, 이미지 기반 스캔 PDF 등으로 추출할 수 없으면 실패 모드를 보고하고 원문 URL과 수동 확인 절차를 안내한다. 사용자가 명시적으로 요청하지 않는 한 OCR 모델 다운로드나 별도 OCR 파이프라인은 실행하지 않는다.
-11. 추출할 수 없거나 문서에 없는 정보는 추정하지 않고 `문서에서 확인 불가` 또는 `기재되어 있지 않음`으로 표시한다.
-12. 작업 후 임시 다운로드 파일과 임시 kordoc 설치 디렉터리를 삭제한다.
-13. 결과에는 항상 공식 출처 URL, 공식 상세 URL, 첨부 원문 URL을 포함한다.
+9. `kordoc` 결과에서 제목, 국가, 기간, 목적, 일정, 출장자, 요약을 문서 근거가 있는 범위에서만 구조화한다.
+10. 비용·일정 관련 텍스트가 있으면 `arithmetic`, `disclosure`, `reviewSignals`, `recommendedDisclosureRequests`, `safeStatements`를 생성한다. 원문에 있는 값만 사용하고 시장가 조회를 하지 않는다.
+11. 추출 실패 시 실패 모드와 원문 URL을 보고한다. 사용자가 명시 요청하지 않으면 OCR을 돌리지 않는다.
+12. 문서에 없는 정보는 추정하지 않는다.
+13. 임시 다운로드·임시 kordoc 설치를 삭제한다.
+14. 결과에는 provider, 공식 출처 URL, 상세 URL, 첨부 URL(있으면)을 포함한다.
+15. 어떤 provider 결과도 부정/낭비/위법 확정 문장으로 쓰지 않는다.
 
 ### HTTP fallback to Aside Browser
 
@@ -387,13 +442,14 @@ npx kordoc /tmp/report.pdf --format json
 - 외부 시장가 조회 기반 적정가 판정
 - 계획서와 결과보고서 비교
 - 평일 관광 일정 자동 판정
-- BTIS, data.go.kr, 타 부처 확장
+- BTIS 로그인 우회 또는 SN/비공개 데이터 수집
+- provider 표 밖 기관 보드 추측 크롤
 - OCR 기반 스캔 PDF 복원 자동 실행
 - 원본 PDF/HWP/HWPX 레포 저장
 
 ## Failure modes
 
-- `unsupported institution`: 선관위가 아닌 기관 요청
+- `unsupported institution`: provider 표에 없는 기관 요청
 - `empty response`: 목록/상세 페이지가 비어 있음
 - `http timeout or partial response`: 직접 HTTP가 일부 응답 후 끝나지 않음. 차단으로 단정하지 말고 Aside Browser fallback을 시도
 - `blocked or login page`: 차단, 점검, 로그인/대기 페이지로 보임
