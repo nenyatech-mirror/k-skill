@@ -91,6 +91,8 @@
 - 국가법령정보센터 지방세법/지방세법 시행령/상법/상업등기법/조세특례제한법: https://www.law.go.kr
 - 국세청 창업중소기업 세액감면 안내: https://www.nts.go.kr
 - real-estate-mcp: https://github.com/tae0y/real-estate-mcp/tree/main
+- realtyprice.kr 개별주택가격 검색 화면: https://www.realtyprice.kr/notice/hpindividual/search.htm — `housing-official-price`가 공개 read-only web data surface로 관측한 개별주택가격 진입점. 가격 목록 JSON은 browser-visible `https://www.realtyprice.kr/notice/search/hpiSearchListApi.search` 형태를 직접 호출하며, 공식 문서화된 OpenAPI 계약으로 취급하지 않는다.
+- realtyprice.kr 공동주택가격 모바일 검색 화면: https://www.realtyprice.kr/notice/m/town/search.do — `housing-official-price`가 공개 read-only web data surface로 관측한 공동주택가격 진입점. 후보/상세/동/호/가격 이력은 `/notice/m/town/getApt.do`, `/notice/m/town/detail.do`, `/notice/m/town/getHo.do`, `/notice/m/town/getPriceYear.do` 흐름으로 직접 호출하며, 응답은 `model.list` 또는 `modelMap.list` 형태가 모두 가능하다.
 - 한국장학재단 학자금 지원구간 산정절차: https://www.kosaf.go.kr/ko/tuition.do?pg=tuition04_09_01&type=tuition
 - 한국장학재단 학자금 지원구간 경곗값 확인: https://www.kosaf.go.kr/ko/tuition.do?naviParam=JH%2C01%2C01%2C03&pg=tuition04_09_07
 - 한국장학재단 푸른등대 기부장학금: https://www.kosaf.go.kr/ko/scholar.do?pg=scholarship05_11_01
@@ -290,3 +292,6 @@
 - 국가유산 목록 API: https://www.khs.go.kr/cha/SearchKindOpenapiList.do — `ccbaMnm1`, `ccbaCtcd`, `pageUnit`, `pageIndex`, `ccbaCncl` 기준 목록 조회. 2026-07-15 실측에서 `ccbaMnm1=경복궁`, `ccbaCtcd=11` 조건으로 XML 11건을 반환했다.
 - 국가유산 상세 API: https://www.khs.go.kr/cha/SearchKindOpenapiDt.do — `ccbaKdcd`, `ccbaAsno`, `ccbaCtcd`로 설명·주소·좌표·이미지를 조회한다. 2026-07-15 실측에서 서울 숭례문 상세 XML 응답을 확인했다.
 - 국가유산 행사 API: https://www.khs.go.kr/cha/openapi/selectEventListOpenapi.do — `searchYear`, `searchMonth`로 월별 국가유산 활용 행사를 조회한다. 2026-07-15 실측에서 2026년 7월 행사 XML 응답을 확인했다.
+- 한국도로공사 공공데이터포털 실시간 교통량: https://data.ex.co.kr/openapi/odtraffic/trafficAmountByRealtime — 공개 데모 키 `test`로 무가입 호출 가능(2026-07-21 확인), 잘못된 키는 HTTP 200 + `{"code":"ERROR"}` 반환
+- 국가교통정보센터 ITS CCTV 정보: https://openapi.its.go.kr:9443/cctvInfo — 공개 데모 키 `test`로 무가입 호출 가능, `getType=json`이어도 성공 응답은 XML, 잘못된 키는 HTTP 401 resultCode 4005
+- 한국은행 ECOS Open API: https://ecos.bok.or.kr/api — positional URL(`/<Service>/<key>/json/kr/...`), 공개 데모 키 `sample`로 무가입 호출 가능(2026-07-21 확인, 호출당 최대 10행/ERROR-301), 잘못된 키는 HTTP 200 + `INFO-100`, 빈 결과는 `INFO-200`
